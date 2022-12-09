@@ -1,6 +1,9 @@
 # git-lfs-transfer
 
-`git-lfs-transfer` is a server-side implementation of the proposed [Git LFS pure SSH-based protocol][proposal]. It is intended to be invoked over SSH to transfer Git LFS objects.
+`git-lfs-transfer` is a server-side implementation of the proposed [Git LFS pure SSH-based protocol][proposal].
+It is intended to be invoked over SSH to transfer Git LFS objects. This was
+originally ported from [bk2204/scutiger](https://github.com/bk2204/scutiger) and
+re-written in Go.
 
 ## Todo
 

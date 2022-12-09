@@ -33,17 +33,12 @@ func New(lfsPath string, umask os.FileMode, timestamp *time.Time) *LocalBackend 
 	}
 }
 
-type oidWithSize struct {
-	transfer.Oid
-	int64
-}
-
 // Batch implements main.Backend
-func (l *LocalBackend) Batch(_ transfer.Operation, oids []oidWithSize) ([]*transfer.BatchItem, error) {
+func (l *LocalBackend) Batch(_ transfer.Operation, oids []transfer.OidWithSize) ([]*transfer.BatchItem, error) {
 	items := make([]*transfer.BatchItem, len(oids))
 	for _, o := range oids {
 		oid := o.Oid
-		size := o.int64
+		size := o.Size
 		stat, err := oid.Stat(l.lfsPath)
 		if err == nil {
 			size = stat.Size()
@@ -57,14 +52,9 @@ func (l *LocalBackend) Batch(_ transfer.Operation, oids []oidWithSize) ([]*trans
 	return items, nil
 }
 
-type downloadFile struct {
-	io.Reader
-	int64
-}
-
 // Download implements main.Backend. The returned reader must be closed by the
 // caller.
-func (l *LocalBackend) Download(oid transfer.Oid, args ...string) (*downloadFile, error) {
+func (l *LocalBackend) Download(oid transfer.Oid, args ...string) (*transfer.File, error) {
 	path := oid.ExpectedPath(l.lfsPath)
 	f, err := os.Open(path)
 	if err != nil {
@@ -75,7 +65,7 @@ func (l *LocalBackend) Download(oid transfer.Oid, args ...string) (*downloadFile
 		f.Close()
 		return nil, err
 	}
-	return &downloadFile{f, info.Size()}, nil
+	return &transfer.File{f, info.Size()}, nil
 }
 
 // FinishUpload implements main.Backend

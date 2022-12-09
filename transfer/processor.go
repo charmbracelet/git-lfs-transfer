@@ -56,10 +56,7 @@ func (p *Processor) ReadBatch(op Operation) ([]*BatchItem, error) {
 	if size < 0 {
 		size = 0
 	}
-	items := make([]struct {
-		Oid
-		int64
-	}, size)
+	items := make([]OidWithSize, size)
 	for _, line := range data[len(args)+1:] {
 		if line == "" {
 			return nil, ErrInvalidPacket
@@ -72,10 +69,7 @@ func (p *Processor) ReadBatch(op Operation) ([]*BatchItem, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid integer, got: %q", ErrParseError, parts[1])
 		}
-		item := struct {
-			Oid
-			int64
-		}{
+		item := OidWithSize{
 			Oid(parts[0]),
 			int64(size),
 		}
@@ -186,7 +180,7 @@ func (p *Processor) GetObject(oid Oid) (Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewSuccessStatusWithReader(r, fmt.Sprintf("size=%d", r.int64)), nil
+	return NewSuccessStatusWithReader(r, fmt.Sprintf("size=%d", r.Size)), nil
 }
 
 // Lock writes a lock to the transfer protocol.

@@ -24,19 +24,19 @@ func (o Operation) String() string {
 	}
 }
 
+// File is a Git LFS file.
+type File struct {
+	io.Reader
+	Size int64
+}
+
 // Backend is a Git LFS backend.
 type Backend interface {
-	Batch(op Operation, oids []struct {
-		Oid
-		int64
-	}) ([]*BatchItem, error)
+	Batch(op Operation, oids []OidWithSize) ([]*BatchItem, error)
 	StartUpload(oid Oid, r io.Reader, args ...string) (interface{}, error)
 	FinishUpload(state interface{}, args ...string) error
 	Verify(oid Oid, args ...string) (Status, error)
-	Download(oid Oid, args ...string) (*struct {
-		io.Reader
-		int64
-	}, error)
+	Download(oid Oid, args ...string) (*File, error)
 	LockBackend() LockBackend
 }
 

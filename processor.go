@@ -1,0 +1,404 @@
+package main
+
+import (
+	"crypto/sha256"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"strconv"
+	"strings"
+)
+
+// Processor is a transfer processor.
+type Processor struct {
+	handler *Pktline
+	backend Backend
+}
+
+// NewProcessor creates a new transfer processor.
+func NewProcessor(line *Pktline, backend Backend) *Processor {
+	return &Processor{
+		handler: line,
+		backend: backend,
+	}
+}
+
+// Version returns the version of the transfer protocol.
+func (p *Processor) Version() (Status, error) {
+	version, err := p.handler.ReadPacketText()
+	if err != nil {
+		return nil, err
+	}
+	return NewSuccessStatus([]string{version}), nil
+}
+
+// Error returns a transfer protocol error.
+func (p *Processor) Error(code uint32, message string) (Status, error) {
+	return NewFailureStatus(code, message), nil
+}
+
+// ReadBatch reads a batch request.
+func (p *Processor) ReadBatch(op Operation) ([]*BatchItem, error) {
+	data, args, err := Parse(p.handler)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	hashAlgo := args[HashAlgoKey]
+	switch hashAlgo {
+	case "", "sha256":
+	default:
+		return nil, fmt.Errorf("%w: %s", ErrNotAllowed, fmt.Sprintf("unsupported hash algorithm: %s", hashAlgo))
+	}
+	// Last line is the delimiter.
+	size := len(data) - len(args) - 1
+	if size < 0 {
+		size = 0
+	}
+	items := make([]struct {
+		Oid
+		int64
+	}, size)
+	for _, line := range data[len(args)+1:] {
+		if line == "" {
+			return nil, ErrInvalidPacket
+		}
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) != 2 || parts[1] == "" {
+			return nil, ErrParseError
+		}
+		size, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid integer, got: %q", ErrParseError, parts[1])
+		}
+		item := struct {
+			Oid
+			int64
+		}{
+			Oid(parts[0]),
+			int64(size),
+		}
+		items = append(items, item)
+	}
+	return p.backend.Batch(op, items)
+}
+
+// BatchData writes batch data to the transfer protocol.
+func (p *Processor) BatchData(op Operation, presentAction string, missingAction string) (Status, error) {
+	batch, err := p.ReadBatch(op)
+	if err != nil {
+		return p.Error(StatusBadRequest, err.Error())
+	}
+	messages := make([]string, len(batch))
+	for i, item := range batch {
+		action := missingAction
+		if item.Present {
+			action = presentAction
+		}
+		message := fmt.Sprintf("%s %d %s\n", item.Oid, item.Size, action)
+		messages[i] = message
+	}
+	return NewSuccessStatus(messages), nil
+}
+
+// UploadBatch writes upload data to the transfer protocol.
+func (p *Processor) UploadBatch() (Status, error) {
+	return p.BatchData(UploadOperation, "noop", "upload")
+}
+
+// DownloadBatch writes download data to the transfer protocol.
+func (p *Processor) DownloadBatch() (Status, error) {
+	return p.BatchData(DownloadOperation, "download", "noop")
+}
+
+// SizeFromArgs returns the size from the given args.
+func (Processor) SizeFromArgs(args map[string]string) (int64, error) {
+	size, ok := args[SizeKey]
+	if !ok {
+		return 0, fmt.Errorf("missing required size header")
+	}
+	n, err := strconv.Atoi(size)
+	if err != nil {
+		return 0, fmt.Errorf("invalid size: %w", err)
+	}
+	return int64(n), nil
+}
+
+// PutObject writes an object ID to the transfer protocol.
+func (p *Processor) PutObject(oid Oid) (Status, error) {
+	args, err := ParseArgsFromHandler(p.handler)
+	if err != nil {
+		return nil, err
+	}
+	expectedSize, err := p.SizeFromArgs(args)
+	if err != nil {
+		return nil, err
+	}
+	r := p.handler.ReaderWithSize(int(expectedSize))
+	rdr := NewHashingReader(r, sha256.New())
+	state, err := p.backend.StartUpload(oid, rdr)
+	if err != nil {
+		return nil, err
+	}
+	actualSize := rdr.Size()
+	if actualSize != expectedSize {
+		err := fmt.Errorf("invalid size, expected %d, got %d", expectedSize, actualSize)
+		if actualSize > expectedSize {
+			err = fmt.Errorf("%w: %s", ErrExtraData, err)
+		} else {
+			err = fmt.Errorf("%w: %s", ErrMissingData, err)
+		}
+		return nil, err
+	}
+	actualOid, err := rdr.Oid()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrCorruptData, err)
+	}
+	if actualOid != oid {
+		return nil, fmt.Errorf("%w: %s", ErrCorruptData, fmt.Sprintf("invalid object ID, expected %s, got %s", oid, actualOid))
+	}
+	if err := p.backend.FinishUpload(state); err != nil {
+		return nil, err
+	}
+	return SuccessStatus(), nil
+}
+
+// VerifyObject verifies an object ID.
+func (p *Processor) VerifyObject(oid Oid) (Status, error) {
+	args, err := ParseArgsFromHandler(p.handler)
+	if err != nil {
+		return p.Error(StatusBadRequest, fmt.Errorf("error parsing batch request: %w", err).Error())
+	}
+	return p.backend.Verify(oid, ArgsToList(args)...)
+}
+
+// GetObject writes an object ID to the transfer protocol.
+func (p *Processor) GetObject(oid Oid) (Status, error) {
+	args, err := ParseArgsFromHandler(p.handler)
+	if err != nil {
+		return p.Error(StatusBadRequest, fmt.Errorf("error parsing batch request: %w", err).Error())
+	}
+	r, err := p.backend.Download(oid, ArgsToList(args)...)
+	if errors.Is(err, fs.ErrNotExist) {
+		return NewFailureStatus(StatusNotFound, fmt.Sprintf("object %s not found", oid)), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return NewSuccessStatusWithReader(r, fmt.Sprintf("size=%d", r.int64)), nil
+}
+
+// Lock writes a lock to the transfer protocol.
+func (p *Processor) Lock() (Status, error) {
+	_, args, err := Parse(p.handler)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	path := args[PathKey]
+	// refname := args[RefnameKey]
+	if path == "" {
+		return nil, fmt.Errorf("%w: %s", ErrMissingData, "path and refname are required")
+	}
+	lockBackend := p.backend.LockBackend()
+	retried := false
+	for !retried {
+		lock, err := lockBackend.Create(path)
+		if errors.Is(err, ErrConflict) {
+			if lock == nil {
+				retried = true
+				continue
+			}
+			return NewFailureStatusWithArgs(StatusConflict, err.Error(), lock.AsArguments()), nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return NewSuccessStatusWithCode(StatusCreated, lock.AsArguments()), nil
+	}
+	// unreachable
+	panic("unreachable")
+}
+
+// ListLocksForPath lists locks for a path. cursor can be empty.
+func (p *Processor) ListLocksForPath(path string, cursor string, useOwnerID bool) (Status, error) {
+	lock, err := p.backend.LockBackend().FromPath(path)
+	if err != nil {
+		return nil, err
+	}
+	if (lock == nil && cursor == "") ||
+		(lock.ID() < cursor) {
+		return p.Error(StatusNotFound, fmt.Sprintf("lock for path %s not found", path))
+	}
+	spec, err := lock.AsLockSpec(useOwnerID)
+	if err != nil {
+		return nil, err
+	}
+	return NewSuccessStatus([]string{spec}), nil
+}
+
+// ListLocks lists locks.
+func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
+	args, err := ParseArgsFromHandler(p.handler)
+	if err != nil {
+		return nil, ErrParseError
+	}
+	limit, err := strconv.Atoi(args[LimitKey])
+	if err != nil {
+		return NewSuccessStatusWithCode(StatusContinue), nil
+	}
+	if limit == 0 {
+		return nil, fmt.Errorf("%w: %s", ErrNotAllowed, "request has no limit")
+	} else if limit > 100 {
+		// Try to avoid DoS attacks.
+		limit = 100
+	}
+	cursor := args[CursorKey]
+	path := args[PathKey]
+	if path != "" {
+		return p.ListLocksForPath(path, cursor, useOwnerID)
+	}
+	locks := make([]Lock, 0)
+	lb := p.backend.LockBackend()
+	// TODO: make this into an iterator.
+	i := 0
+	for lb.Next() || i < limit+1 {
+		if lb.Err() != nil || cursor == "" {
+			// TODO: handle error
+			continue
+		}
+		lock := lb.Value()
+		if lock == nil || lock.ID() < cursor {
+			continue
+		}
+		i++
+		locks = append(locks, lock)
+	}
+	specs := make([]string, 0, len(locks))
+	for _, item := range locks {
+		spec, err := item.AsLockSpec(useOwnerID)
+		if err != nil {
+			return nil, err
+		}
+		specs = append(specs, spec)
+	}
+	nextCursor := ""
+	if len(locks) == limit+1 {
+		nextCursor = fmt.Sprintf("next-cursor=%s\n", locks[limit].ID())
+	}
+	return NewSuccessStatusWithData(StatusAccepted, specs, nextCursor), nil
+}
+
+// Unlock unlocks a lock.
+func (p *Processor) Unlock(id string) (Status, error) {
+	_, _ = p.handler.ReadPacket()
+	lock, err := p.backend.LockBackend().FromID(id)
+	if err != nil {
+		return nil, err
+	}
+	if lock == nil {
+		return p.Error(StatusNotFound, fmt.Sprintf("lock %s not found", id))
+	}
+	if err := lock.Unlock(); err != nil {
+		switch {
+		case errors.Is(err, os.ErrNotExist):
+			return p.Error(StatusNotFound, fmt.Sprintf("lock %s not found", id))
+		case errors.Is(err, os.ErrPermission):
+			return p.Error(StatusForbidden, fmt.Sprintf("lock %s not owned by you", id))
+		default:
+			return nil, err
+		}
+	}
+	return NewSuccessStatusWithCode(StatusOK, lock.AsArguments()), nil
+}
+
+// ProcessCommands processes commands from the transfer protocol.
+func (p *Processor) ProcessCommands(op Operation) error {
+	for {
+		pkt, err := p.handler.ReadPacketText()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if pkt == "" {
+			p.handler.SendError(StatusBadRequest, "unknown command")
+			continue
+		}
+		msgs := strings.Split(pkt, " ")
+		if len(msgs) < 1 {
+			p.handler.SendError(StatusBadRequest, "no command provided")
+			continue
+		}
+		var status Status
+		switch msgs[0] {
+		case versionCommand:
+			if len(msgs) > 1 && msgs[1] != "1" {
+				status, err = p.Version()
+			} else {
+				err = p.handler.SendError(StatusBadRequest, "unknown version")
+			}
+		case batchCommand:
+			switch op {
+			case UploadOperation:
+				status, err = p.UploadBatch()
+			case DownloadOperation:
+				status, err = p.DownloadBatch()
+			}
+		case putObjectCommand:
+			if len(msgs) > 1 {
+				status, err = p.PutObject(Oid(msgs[1]))
+			} else {
+				err = p.handler.SendError(StatusForbidden, "not allowed")
+			}
+		case verifyObjectCommand:
+			if len(msgs) > 1 {
+				status, err = p.VerifyObject(Oid(msgs[1]))
+			} else {
+				err = p.handler.SendError(StatusForbidden, "not allowed")
+			}
+		case getObjectCommand:
+			if len(msgs) > 1 {
+				status, err = p.GetObject(Oid(msgs[1]))
+			} else {
+				err = p.handler.SendError(StatusForbidden, "not allowed")
+			}
+		case lockCommand:
+			status, err = p.Lock()
+		case listLockCommand:
+			switch op {
+			case UploadOperation:
+				status, err = p.ListLocks(true)
+			case DownloadOperation:
+				status, err = p.ListLocks(false)
+			}
+		case unlockCommand:
+			if len(msgs) > 1 {
+				status, err = p.Unlock(msgs[1])
+			} else {
+				err = p.handler.SendError(StatusBadRequest, "unknown command")
+			}
+		case quitCommand:
+			status = SuccessStatus()
+		default:
+			err = p.handler.SendError(StatusBadRequest, "unknown command")
+		}
+		if err != nil {
+			switch {
+			case errors.Is(err, ErrExtraData),
+				errors.Is(err, ErrNotAllowed),
+				errors.Is(err, ErrInvalidPacket),
+				errors.Is(err, ErrCorruptData):
+				return p.handler.SendError(StatusBadRequest, fmt.Errorf("error: %w", err).Error())
+			default:
+				return p.handler.SendError(StatusInternalServerError, "internal error")
+			}
+		}
+		if status != nil {
+			return p.handler.SendStatus(status)
+		}
+		// unreachable
+		return fmt.Errorf("unknown error")
+	}
+}

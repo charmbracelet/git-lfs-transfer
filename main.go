@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,17 +10,6 @@ import (
 
 	"github.com/charmbracelet/git-lfs-transfer/internal/local"
 	"github.com/charmbracelet/git-lfs-transfer/transfer"
-	"github.com/spf13/cobra"
-)
-
-var (
-	// RootCmd is the root command for the git-lfs-transfer command.
-	rootCmd = &cobra.Command{
-		Use:   "git-lfs-transfer PATH OPERATION",
-		Short: "Git LFS SSH transfer agent",
-		Args:  cobra.ExactArgs(2),
-		RunE:  run,
-	}
 )
 
 func ensureDirs(path string) error {
@@ -31,7 +21,7 @@ func ensureDirs(path string) error {
 	return nil
 }
 
-func run(cmd *cobra.Command, args []string) error {
+func run(r io.Reader, w io.Writer, args []string) error {
 	if len(args) != 2 {
 		return fmt.Errorf("expected 2 arguments, got %d", len(args))
 	}
@@ -50,7 +40,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if err := ensureDirs(path); err != nil {
 		return err
 	}
-	handler := transfer.NewPktline(cmd.InOrStdin(), cmd.OutOrStdout())
+	handler := transfer.NewPktline(r, w)
 	if err := handler.WritePacketText("version=1"); err != nil {
 		return err
 	}
@@ -68,11 +58,20 @@ func run(cmd *cobra.Command, args []string) error {
 	default:
 		return fmt.Errorf("unknown operation %q", op)
 	}
-	return nil
+}
+
+func usage() string {
+	return `Git LFS SSH transfer agent
+
+Usage:
+  git-lfs-transfer PATH OPERATION
+`
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := run(os.Stdin, os.Stdout, os.Args[1:]); err != nil {
+		fmt.Fprintf(os.Stderr, usage())
+		fmt.Println()
 		fmt.Println(err)
 		os.Exit(1)
 	}

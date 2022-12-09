@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	transfer "github.com/aymanbagabas/git-lfs-transfer"
+	"github.com/charmbracelet/git-lfs-transfer/transfer"
 )
 
 // LockFile is a local backend lock file.

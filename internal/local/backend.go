@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	transfer "github.com/aymanbagabas/git-lfs-transfer"
+	"github.com/charmbracelet/git-lfs-transfer/transfer"
 )
 
 var _ transfer.Backend = &LocalBackend{}

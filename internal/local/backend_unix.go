@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"syscall"
 
-	transfer "github.com/aymanbagabas/git-lfs-transfer"
+	"github.com/charmbracelet/git-lfs-transfer/transfer"
 )
 
 // FixPermissions fixes the permissions of the file at the given path.

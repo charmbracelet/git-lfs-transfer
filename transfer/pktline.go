@@ -39,7 +39,8 @@ func NewPktline(r io.Reader, w io.Writer) *Pktline {
 
 // SendError sends an error msg.
 func (p *Pktline) SendError(status uint32, message string) error {
-	if err := p.WritePacketText(fmt.Sprintf("status: %03d\n", status)); err != nil {
+	Logf("sending error: %d %s", status, message)
+	if err := p.WritePacketText(fmt.Sprintf("status %03d", status)); err != nil {
 		return err
 	}
 	if err := p.WriteDelim(); err != nil {
@@ -53,7 +54,8 @@ func (p *Pktline) SendError(status uint32, message string) error {
 
 // SendStatus sends a status message.
 func (p *Pktline) SendStatus(status Status) error {
-	if err := p.WritePacketText(fmt.Sprintf("status: %03d\n", status.Code())); err != nil {
+	Logf("sending status: %s", status)
+	if err := p.WritePacketText(fmt.Sprintf("status %03d", status.Code())); err != nil {
 		return err
 	}
 	if args := status.Args(); len(args) > 0 {
@@ -84,7 +86,6 @@ func (p *Pktline) SendStatus(status Status) error {
 		if _, err := io.Copy(w, r); err != nil {
 			return err
 		}
-
 	}
 	return p.WriteFlush()
 }

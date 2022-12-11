@@ -1,6 +1,8 @@
 package transfer
 
-import "io"
+import (
+	"io"
+)
 
 // Operation is a Git LFS operation.
 type Operation int
@@ -32,7 +34,7 @@ type File struct {
 
 // Backend is a Git LFS backend.
 type Backend interface {
-	Batch(op Operation, oids []OidWithSize) ([]*BatchItem, error)
+	Batch(op Operation, oids []OidWithSize) ([]BatchItem, error)
 	StartUpload(oid Oid, r io.Reader, args ...string) (interface{}, error)
 	FinishUpload(state interface{}, args ...string) error
 	Verify(oid Oid, args ...string) (Status, error)
@@ -51,18 +53,11 @@ type Lock interface {
 	AsArguments() string
 }
 
-// Iterator is an iterator interface.
-type Iterator[T any] interface {
-	Next() bool
-	Value() T
-	Err() error
-}
-
 // LockBackend is a Git LFS lock backend.
 type LockBackend interface {
-	Iterator[Lock]
 	Create(path string) (Lock, error)
 	Unlock(lock Lock) error
 	FromPath(path string) (Lock, error)
 	FromID(id string) (Lock, error)
+	Range(func(Lock) error) error
 }

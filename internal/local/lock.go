@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/git-lfs-transfer/transfer"
@@ -121,38 +120,39 @@ func (localBackendLock) Parse(data []byte) (*time.Time, []byte, error) {
 }
 
 // AsArguments implements main.Lock
-func (l *localBackendLock) AsArguments() string {
-	var s strings.Builder
-	s.WriteString(fmt.Sprintf("id=%s\n", l.ID()))
-	s.WriteString(fmt.Sprintf("path=%s\n", l.Path()))
-	s.WriteString(fmt.Sprintf("locked-at=%s\n", l.FormattedTimestamp()))
-	s.WriteString(fmt.Sprintf("ownername=%s\n", l.OwnerName()))
-	return s.String()
+func (l *localBackendLock) AsArguments() []string {
+	return []string{
+		fmt.Sprintf("id=%s", l.ID()),
+		fmt.Sprintf("path=%s", l.Path()),
+		fmt.Sprintf("locked-at=%s", l.FormattedTimestamp()),
+		fmt.Sprintf("ownername=%s", l.OwnerName()),
+	}
 }
 
-// AsLockSpec implements main.Lock
-func (l *localBackendLock) AsLockSpec(ownerID bool) (string, error) {
-	var s strings.Builder
+// AsLockSpec implements main.Lock.
+func (l *localBackendLock) AsLockSpec(ownerID bool) ([]string, error) {
 	id := l.ID()
-	s.WriteString(fmt.Sprintf("lock %s\n", id))
-	s.WriteString(fmt.Sprintf("path %s %s\n", id, l.Path()))
-	s.WriteString(fmt.Sprintf("locked-at %s %s\n", id, l.FormattedTimestamp()))
-	s.WriteString(fmt.Sprintf("ownername %s %s\n", id, l.OwnerName()))
+	msgs := []string{
+		fmt.Sprintf("lock %s", id),
+		fmt.Sprintf("path %s %s", id, l.Path()),
+		fmt.Sprintf("locked-at %s %s", id, l.FormattedTimestamp()),
+		fmt.Sprintf("ownername %s %s", id, l.OwnerName()),
+	}
 	if ownerID {
 		user, err := l.CurrentUser()
 		if err != nil {
-			return "", fmt.Errorf("error getting current user: %w", err)
+			return nil, fmt.Errorf("error getting current user: %w", err)
 		}
 		who := "theirs"
 		if user == l.OwnerName() {
 			who = "ours"
 		}
-		s.WriteString(fmt.Sprintf("owner %s %s\n", id, who))
+		msgs = append(msgs, fmt.Sprintf("owner %s %s", id, who))
 	}
-	return s.String(), nil
+	return msgs, nil
 }
 
-// FormattedTimestamp implements main.Lock
+// FormattedTimestamp implements main.Lock.
 func (l *localBackendLock) FormattedTimestamp() string {
 	return l.time.UTC().Format(time.RFC3339)
 }
@@ -162,17 +162,17 @@ func (l *localBackendLock) ID() string {
 	return l.HashFor(l.pathName)
 }
 
-// OwnerName implements main.Lock
+// OwnerName implements main.Lock.
 func (l *localBackendLock) OwnerName() string {
 	return l.ownerName
 }
 
-// Path implements main.Lock
+// Path implements main.Lock.
 func (l *localBackendLock) Path() string {
 	return l.pathName
 }
 
-// Unlock implements main.Lock
+// Unlock implements main.Lock.
 func (l *localBackendLock) Unlock() error {
 	id := l.HashFor(l.pathName)
 	fileName := filepath.Join(l.root, id)

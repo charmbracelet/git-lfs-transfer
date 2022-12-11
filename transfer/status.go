@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -37,6 +38,15 @@ type status struct {
 	args     []string
 	messages []string
 	reader   io.Reader
+}
+
+// String returns the string representation of the status.
+func (s status) String() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "status %d ", s.code)
+	fmt.Fprintf(&b, "args %v ", s.args)
+	fmt.Fprintf(&b, "messages %v ", s.messages)
+	return b.String()
 }
 
 // Code returns the status code.

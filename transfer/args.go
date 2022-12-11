@@ -42,7 +42,7 @@ func ParseArgs(lines []string) (map[string]string, error) {
 		if lines[i] == "" {
 			break
 		}
-		argLines = append(argLines, string(lines[i]))
+		argLines = append(argLines, lines[i])
 	}
 	args := make(map[string]string, 0)
 	for _, line := range argLines {

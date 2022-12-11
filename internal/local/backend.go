@@ -2,10 +2,10 @@ package local
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"io/fs"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -34,8 +34,8 @@ func New(lfsPath string, umask os.FileMode, timestamp *time.Time) *LocalBackend 
 }
 
 // Batch implements main.Backend
-func (l *LocalBackend) Batch(_ transfer.Operation, oids []transfer.OidWithSize) ([]*transfer.BatchItem, error) {
-	items := make([]*transfer.BatchItem, len(oids))
+func (l *LocalBackend) Batch(_ transfer.Operation, oids []transfer.OidWithSize) ([]transfer.BatchItem, error) {
+	items := make([]transfer.BatchItem, len(oids))
 	for _, o := range oids {
 		oid := o.Oid
 		size := o.Size
@@ -43,7 +43,7 @@ func (l *LocalBackend) Batch(_ transfer.Operation, oids []transfer.OidWithSize) 
 		if err == nil {
 			size = stat.Size()
 		}
-		items = append(items, &transfer.BatchItem{
+		items = append(items, transfer.BatchItem{
 			Oid:     oid,
 			Size:    size,
 			Present: size > 0,
@@ -65,10 +65,10 @@ func (l *LocalBackend) Download(oid transfer.Oid, args ...string) (*transfer.Fil
 		f.Close()
 		return nil, err
 	}
-	return &transfer.File{f, info.Size()}, nil
+	return &transfer.File{Reader: f, Size: info.Size()}, nil
 }
 
-// FinishUpload implements main.Backend
+// FinishUpload implements main.Backend.
 func (l *LocalBackend) FinishUpload(state interface{}, args ...string) error {
 	switch state := state.(type) {
 	case *UploadState:
@@ -102,7 +102,6 @@ type UploadState struct {
 // StartUpload implements main.Backend.
 func (l *LocalBackend) StartUpload(oid transfer.Oid, r io.Reader, args ...string) (interface{}, error) {
 	tempDir := filepath.Join(l.lfsPath, "incomplete")
-	rand.Seed(time.Now().UnixNano())
 	randBytes := make([]byte, 12)
 	if _, err := rand.Read(randBytes); err != nil {
 		return nil, err
@@ -150,11 +149,6 @@ var _ transfer.LockBackend = &localLockBackend{}
 type localLockBackend struct {
 	backend  transfer.Backend
 	lockPath string
-	data     []fs.DirEntry
-	pos      int
-	item     transfer.Lock
-	err      error
-	done     bool
 }
 
 // NewLockBackend creates a new local lock backend.
@@ -225,49 +219,24 @@ func (localLockBackend) Unlock(lock transfer.Lock) error {
 	return lock.Unlock()
 }
 
-// Next returns true if there are more locks.
-func (l *localLockBackend) Next() bool {
-	if l.data == nil {
-		data, err := os.ReadDir(l.lockPath)
+// Range implements main.LockBackend. Iterate over all locks. Returning an error will break and return.
+func (l *localLockBackend) Range(f func(l transfer.Lock) error) error {
+	data, err := os.ReadDir(l.lockPath)
+	if err != nil {
+		return err
+	}
+	sort.Slice(data, func(i, j int) bool {
+		return data[i].Name() < data[j].Name()
+	})
+	for _, lf := range data {
+		lock, err := l.FromID(lf.Name())
 		if err != nil {
-			l.err = err
-			return false
-		}
-		sort.Slice(data, func(i, j int) bool {
-			return data[i].Name() < data[j].Name()
-		})
-		l.data = data
-		l.pos = 0
-		l.done = len(data) == 0
-		l.err = nil
-	}
-	if l.done {
-		return false
-	}
-	if l.err != nil {
-		return false
-	}
-	for l.pos < len(l.data) {
-		pos := l.pos
-		l.pos++
-		item := l.data[pos]
-		filename := item.Name()
-		lock, err := l.FromID(filename)
-		if err != nil {
+			// TODO: handle error
 			continue
 		}
-		l.item = lock
-		return true
+		if err := f(lock); err != nil {
+			return err
+		}
 	}
-	return false
-}
-
-// Value returns the current iterator lock.
-func (l *localLockBackend) Value() transfer.Lock {
-	return l.item
-}
-
-// Err returns the iterator error.
-func (l *localLockBackend) Err() error {
-	return l.err
+	return nil
 }

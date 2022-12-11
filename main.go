@@ -69,10 +69,16 @@ Usage:
 }
 
 func main() {
+	if debug := os.Getenv("GIT_LFS_TRANSFER_DEBUG"); debug == "true" {
+		transfer.Debug = true
+	}
+
+	transfer.Logf("git-lfs-transfer %s", "v1")
+	defer transfer.Log("git-lfs-transfer completed")
 	if err := run(os.Stdin, os.Stdout, os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, usage())
-		fmt.Println()
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

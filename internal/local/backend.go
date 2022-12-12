@@ -35,7 +35,7 @@ func New(lfsPath string, umask os.FileMode, timestamp *time.Time) *LocalBackend 
 
 // Batch implements main.Backend
 func (l *LocalBackend) Batch(_ transfer.Operation, oids []transfer.OidWithSize) ([]transfer.BatchItem, error) {
-	items := make([]transfer.BatchItem, len(oids))
+	items := make([]transfer.BatchItem, 0)
 	for _, o := range oids {
 		oid := o.Oid
 		size := o.Size

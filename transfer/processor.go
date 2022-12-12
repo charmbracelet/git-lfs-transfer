@@ -52,13 +52,8 @@ func (p *Processor) ReadBatch(op Operation) ([]BatchItem, error) {
 		return nil, fmt.Errorf("%w: %s", ErrNotAllowed, fmt.Sprintf("unsupported hash algorithm: %s", hashAlgo))
 	}
 	Logf("data: %d %v", len(data), data)
-	Logf("batch: %s args: %d %v", op, len(args), args)
-	// Last line is the delimiter.
-	size := len(data) - len(args) - 1
-	if size < 0 {
-		size = 0
-	}
-	items := make([]OidWithSize, size)
+	Logf("batch: %s args: %d %v data: %d %v", op, len(args), args, len(data), data)
+	items := make([]OidWithSize, 0)
 	for _, line := range data {
 		if line == "" {
 			return nil, ErrInvalidPacket
@@ -77,7 +72,13 @@ func (p *Processor) ReadBatch(op Operation) ([]BatchItem, error) {
 		}
 		items = append(items, item)
 	}
-	return p.backend.Batch(op, items)
+	Logf("items %v", items)
+	its, err := p.backend.Batch(op, items)
+	if err != nil {
+		return nil, err
+	}
+	Logf("batch items: %v", its)
+	return its, nil
 }
 
 // BatchData writes batch data to the transfer protocol.
@@ -204,12 +205,12 @@ func (p *Processor) Lock() (Status, error) {
 				retried = true
 				continue
 			}
-			return NewFailureStatusWithArgs(StatusConflict, err.Error(), lock.AsArguments()), nil
+			return NewFailureStatusWithArgs(StatusConflict, err.Error(), lock.AsArguments()...), nil
 		}
 		if err != nil {
 			return nil, err
 		}
-		return NewSuccessStatusWithCode(StatusCreated, lock.AsArguments()), nil
+		return NewSuccessStatusWithCode(StatusCreated, lock.AsArguments()...), nil
 	}
 	// unreachable
 	panic("unreachable")
@@ -229,7 +230,7 @@ func (p *Processor) ListLocksForPath(path string, cursor string, useOwnerID bool
 	if err != nil {
 		return nil, err
 	}
-	return NewSuccessStatus([]string{spec}), nil
+	return NewSuccessStatus(spec), nil
 }
 
 // ListLocks lists locks.
@@ -270,19 +271,19 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 		locks = append(locks, lock)
 		return nil
 	})
-	specs := make([]string, 0, len(locks))
+	msgs := make([]string, 0, len(locks))
 	for _, item := range locks {
-		spec, err := item.AsLockSpec(useOwnerID)
+		specs, err := item.AsLockSpec(useOwnerID)
 		if err != nil {
 			return nil, err
 		}
-		specs = append(specs, spec)
+		msgs = append(msgs, specs...)
 	}
 	nextCursor := ""
 	if len(locks) == limit+1 {
 		nextCursor = fmt.Sprintf("next-cursor=%s", locks[limit].ID())
 	}
-	return NewSuccessStatusWithData(StatusAccepted, specs, nextCursor), nil
+	return NewSuccessStatusWithData(StatusAccepted, msgs, nextCursor), nil
 }
 
 // Unlock unlocks a lock.
@@ -305,7 +306,7 @@ func (p *Processor) Unlock(id string) (Status, error) {
 			return nil, err
 		}
 	}
-	return NewSuccessStatusWithCode(StatusOK, lock.AsArguments()), nil
+	return NewSuccessStatusWithCode(StatusOK, lock.AsArguments()...), nil
 }
 
 // ProcessCommands processes commands from the transfer protocol.

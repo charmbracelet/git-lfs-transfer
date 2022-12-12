@@ -49,8 +49,8 @@ type Lock interface {
 	Path() string
 	FormattedTimestamp() string
 	OwnerName() string
-	AsLockSpec(ownerID bool) (string, error)
-	AsArguments() string
+	AsLockSpec(ownerID bool) ([]string, error)
+	AsArguments() []string
 }
 
 // LockBackend is a Git LFS lock backend.

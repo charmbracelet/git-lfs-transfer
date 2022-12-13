@@ -30,11 +30,17 @@ const (
 // PktLine is a Git packet line handler.
 type Pktline struct {
 	*pktline.Pktline
+	r io.Reader
+	w io.Writer
 }
 
 // NewPktline creates a new Git packet line handler.
 func NewPktline(r io.Reader, w io.Writer) *Pktline {
-	return &Pktline{pktline.NewPktline(r, w)}
+	return &Pktline{
+		Pktline: pktline.NewPktline(r, w),
+		r:       r,
+		w:       w,
+	}
 }
 
 // SendError sends an error msg.
@@ -43,11 +49,13 @@ func (p *Pktline) SendError(status uint32, message string) error {
 	if err := p.WritePacketText(fmt.Sprintf("status %03d", status)); err != nil {
 		return err
 	}
-	if err := p.WriteDelim(); err != nil {
-		return err
-	}
-	if err := p.WritePacketText(message); err != nil {
-		return err
+	if message != "" {
+		if err := p.WriteDelim(); err != nil {
+			return err
+		}
+		if err := p.WritePacketText(fmt.Sprintf("message %s", message)); err != nil {
+			return err
+		}
 	}
 	return p.WriteFlush()
 }
@@ -108,4 +116,46 @@ func (p *Pktline) Writer() io.Writer {
 // WriterWithSize returns a writer for the packet line with the given size.
 func (p *Pktline) WriterWithSize(size int) io.Writer {
 	return pktline.NewPktlineWriterFromPktline(p.Pktline, size)
+}
+
+// ReadPacketListToDelim reads as many packets as possible using the `readPacketText`
+// function before encountering a delim packet. It returns a slice of all the
+// packets it read, or an error if one was encountered.
+func (p *Pktline) ReadPacketListToDelim() ([]string, error) {
+	var list []string
+	for {
+		data, pktLen, err := p.ReadPacketTextWithLength()
+		if err != nil {
+			return nil, err
+		}
+
+		if pktLen == Delim {
+			break
+		}
+
+		list = append(list, data)
+	}
+
+	return list, nil
+}
+
+// ReadPacketListToFlush reads as many packets as possible using the `readPacketText`
+// function before encountering a flush packet. It returns a slice of all the
+// packets it read, or an error if one was encountered.
+func (p *Pktline) ReadPacketListToFlush() ([]string, error) {
+	var list []string
+	for {
+		data, pktLen, err := p.ReadPacketTextWithLength()
+		if err != nil {
+			return nil, err
+		}
+
+		if pktLen == Flush {
+			break
+		}
+
+		list = append(list, data)
+	}
+
+	return list, nil
 }

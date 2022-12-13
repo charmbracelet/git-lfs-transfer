@@ -18,34 +18,32 @@ const (
 	CursorKey    = "cursor"
 )
 
-// Parse parsed the given batch request.
-func Parse(handler *Pktline) ([]string, map[string]string, error) {
-	data, err := handler.ReadPacketList()
-	if err != nil {
-		return nil, nil, fmt.Errorf("error reading batch request: %w", err)
-	}
-	if len(data) < 3 {
-		return nil, nil, fmt.Errorf("invalid batch request")
-	}
-	args, err := ParseArgs(data)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error parsing batch request: %w", err)
-	}
-	return data[len(args)+1:], args, nil
-}
+// // Parse parsed the given batch request.
+// func Parse(handler *Pktline) ([]string, map[string]string, error) {
+// 	data, err := handler.ReadPacketList()
+// 	if err != nil {
+// 		return nil, nil, fmt.Errorf("error reading batch request: %w", err)
+// 	}
+// 	// Logf("parse data: %d %v", len(data), data)
+// 	// if len(data) < 3 {
+// 	// 	return nil, nil, fmt.Errorf("invalid batch request")
+// 	// }
+// 	args, err := ParseArgs(data)
+// 	if err != nil {
+// 		return nil, nil, fmt.Errorf("error parsing batch request: %w", err)
+// 	}
+// 	Logf("parse: data %d %v args %d %v", len(data), data, len(args), args)
+// 	length := len(args) + 1
+// 	if len(args) == len(data) {
+// 		length = 0
+// 	}
+// 	return data[length:], args, nil
+// }
 
 // ParseArgs parses the given args.
 func ParseArgs(lines []string) (map[string]string, error) {
-	argLines := make([]string, 0)
-	// Read until delimiter (empty string).
-	for i := 0; i < len(lines); i++ {
-		if lines[i] == "" {
-			break
-		}
-		argLines = append(argLines, lines[i])
-	}
 	args := make(map[string]string, 0)
-	for _, line := range argLines {
+	for _, line := range lines {
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid argument: %q", line)
@@ -53,14 +51,18 @@ func ParseArgs(lines []string) (map[string]string, error) {
 		key, value := parts[0], parts[1]
 		args[key] = value
 	}
+	Logf("args: %d %v", len(args), args)
 	return args, nil
 }
 
-// ParseArgsFromHandler parses the given args.
-func ParseArgsFromHandler(handler *Pktline) (map[string]string, error) {
-	_, args, err := Parse(handler)
-	return args, err
-}
+// // ParseArgsFromHandler parses the given args.
+// func ParseArgsFromHandler(handler *Pktline) (map[string]string, error) {
+// 	ar, err := handler.ReadPacketListToDelim()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return ParseArgs(ar)
+// }
 
 // ArgsToList converts the given args to a list.
 func ArgsToList(args map[string]string) []string {

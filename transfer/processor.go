@@ -41,7 +41,15 @@ func (p *Processor) Error(code uint32, message string) (Status, error) {
 
 // ReadBatch reads a batch request.
 func (p *Processor) ReadBatch(op Operation) ([]BatchItem, error) {
-	data, args, err := Parse(p.handler)
+	ar, err := p.handler.ReadPacketListToDelim()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	args, err := ParseArgs(ar)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	data, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
@@ -87,15 +95,15 @@ func (p *Processor) BatchData(op Operation, presentAction string, missingAction 
 	if err != nil {
 		return p.Error(StatusBadRequest, err.Error())
 	}
-	messages := make([]string, len(batch))
-	for i, item := range batch {
+	oids := make([]string, 0)
+	for _, item := range batch {
 		action := missingAction
 		if item.Present {
 			action = presentAction
 		}
-		messages[i] = fmt.Sprintf("%s %d %s", item.Oid, item.Size, action)
+		oids = append(oids, fmt.Sprintf("%s %d %s", item.Oid, item.Size, action))
 	}
-	return NewSuccessStatus(messages), nil
+	return NewSuccessStatus(oids), nil
 }
 
 // UploadBatch writes upload data to the transfer protocol.
@@ -123,9 +131,13 @@ func (Processor) SizeFromArgs(args map[string]string) (int64, error) {
 
 // PutObject writes an object ID to the transfer protocol.
 func (p *Processor) PutObject(oid Oid) (Status, error) {
-	args, err := ParseArgsFromHandler(p.handler)
+	ar, err := p.handler.ReadPacketListToDelim()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	args, err := ParseArgs(ar)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
 	expectedSize, err := p.SizeFromArgs(args)
 	if err != nil {
@@ -133,6 +145,11 @@ func (p *Processor) PutObject(oid Oid) (Status, error) {
 	}
 	r := p.handler.ReaderWithSize(int(expectedSize))
 	rdr := NewHashingReader(r, sha256.New())
+	bts, err := io.ReadAll(rdr)
+	if err != nil {
+		return nil, err
+	}
+	Logf("hash reader %d %s", rdr.Size(), bts)
 	state, err := p.backend.StartUpload(oid, rdr)
 	if err != nil {
 		return nil, err
@@ -162,18 +179,26 @@ func (p *Processor) PutObject(oid Oid) (Status, error) {
 
 // VerifyObject verifies an object ID.
 func (p *Processor) VerifyObject(oid Oid) (Status, error) {
-	args, err := ParseArgsFromHandler(p.handler)
+	ar, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
-		return p.Error(StatusBadRequest, fmt.Errorf("error parsing batch request: %w", err).Error())
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	args, err := ParseArgs(ar)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
 	return p.backend.Verify(oid, ArgsToList(args)...)
 }
 
 // GetObject writes an object ID to the transfer protocol.
 func (p *Processor) GetObject(oid Oid) (Status, error) {
-	args, err := ParseArgsFromHandler(p.handler)
+	ar, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
-		return p.Error(StatusBadRequest, fmt.Errorf("error parsing batch request: %w", err).Error())
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	args, err := ParseArgs(ar)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
 	r, err := p.backend.Download(oid, ArgsToList(args)...)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -187,7 +212,11 @@ func (p *Processor) GetObject(oid Oid) (Status, error) {
 
 // Lock writes a lock to the transfer protocol.
 func (p *Processor) Lock() (Status, error) {
-	_, args, err := Parse(p.handler)
+	data, err := p.handler.ReadPacketListToFlush()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	args, err := ParseArgs(data)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
@@ -235,9 +264,13 @@ func (p *Processor) ListLocksForPath(path string, cursor string, useOwnerID bool
 
 // ListLocks lists locks.
 func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
-	args, err := ParseArgsFromHandler(p.handler)
+	ar, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
-		return nil, ErrParseError
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	args, err := ParseArgs(ar)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
 	limit, err := strconv.Atoi(args[LimitKey])
 	if err != nil {
@@ -346,8 +379,10 @@ func (p *Processor) ProcessCommands(op Operation) error {
 		case batchCommand:
 			switch op {
 			case UploadOperation:
+				Logf("upload batch command received")
 				status, err = p.UploadBatch()
 			case DownloadOperation:
+				Logf("download batch command received")
 				status, err = p.DownloadBatch()
 			}
 		case putObjectCommand:
@@ -400,6 +435,7 @@ func (p *Processor) ProcessCommands(op Operation) error {
 					Logf("error pktline sending error: %v", err)
 				}
 			default:
+				Logf("error processing command: %v", err)
 				if err := p.handler.SendError(StatusInternalServerError, "internal error"); err != nil {
 					Logf("error pktline sending error: %v", err)
 				}

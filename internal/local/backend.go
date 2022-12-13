@@ -39,14 +39,16 @@ func (l *LocalBackend) Batch(_ transfer.Operation, oids []transfer.OidWithSize) 
 	for _, o := range oids {
 		oid := o.Oid
 		size := o.Size
+		present := false
 		stat, err := oid.Stat(l.lfsPath)
 		if err == nil {
 			size = stat.Size()
+			present = true
 		}
 		items = append(items, transfer.BatchItem{
 			Oid:     oid,
 			Size:    size,
-			Present: size > 0,
+			Present: present,
 		})
 	}
 	return items, nil
@@ -74,11 +76,20 @@ func (l *LocalBackend) FinishUpload(state interface{}, args ...string) error {
 	case *UploadState:
 		destPath := state.Oid.ExpectedPath(l.lfsPath)
 		parent := filepath.Dir(destPath)
-		if err := os.MkdirAll(parent, 0777^l.umask); err != nil {
+		transfer.Logf("finishing upload of %s at %s", destPath, parent)
+		if err := os.MkdirAll(parent, 0777); err != nil {
 			return err
 		}
-		_, err := l.FixPermissions(state.TempFile)
+		f, err := os.Open(destPath)
 		if err != nil {
+			return fmt.Errorf("failed to open file %w", err)
+		}
+		if _, err := io.Copy(f, state.TempFile); err != nil {
+			return fmt.Errorf("failed to copy temp file data to file %w", err)
+		}
+		defer f.Close()
+		defer state.TempFile.Close()
+		if _, err := l.FixPermissions(destPath); err != nil {
 			return err
 		}
 		return nil
@@ -96,11 +107,15 @@ func (l *LocalBackend) LockBackend() transfer.LockBackend {
 // UploadState is a state for an upload.
 type UploadState struct {
 	Oid      transfer.Oid
-	TempFile string
+	TempFile *os.File
 }
 
-// StartUpload implements main.Backend.
+// StartUpload implements main.Backend. The returned temp file should be closed.
 func (l *LocalBackend) StartUpload(oid transfer.Oid, r io.Reader, args ...string) (interface{}, error) {
+	if r == nil {
+		return nil, fmt.Errorf("%w: received null data", transfer.ErrMissingData)
+	}
+	transfer.Logf("start uploading %s", oid)
 	tempDir := filepath.Join(l.lfsPath, "incomplete")
 	randBytes := make([]byte, 12)
 	if _, err := rand.Read(randBytes); err != nil {
@@ -112,13 +127,12 @@ func (l *LocalBackend) StartUpload(oid transfer.Oid, r io.Reader, args ...string
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 	if _, err := io.Copy(f, r); err != nil {
 		return nil, err
 	}
 	return &UploadState{
 		Oid:      oid,
-		TempFile: tempFile,
+		TempFile: f,
 	}, nil
 }
 

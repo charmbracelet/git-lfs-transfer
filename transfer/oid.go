@@ -58,7 +58,7 @@ func (o Oid) Value() []byte {
 // be a `.git/lfs` directory.
 func (o Oid) ExpectedPath(path string) string {
 	b := o.Value()
-	return filepath.Join(path, string(b[0:2]), string(b[2:4]), string(b))
+	return filepath.Join(path, "objects", string(b[0:2]), string(b[2:4]), string(b))
 }
 
 // Stat returns the file info of the Oid. The path argument should be a `.git/lfs`

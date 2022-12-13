@@ -19,6 +19,7 @@ func (l *LocalBackend) FixPermissions(path string) (transfer.Status, error) {
 	if err != nil {
 		return nil, err
 	}
+	transfer.Logf("settings permissions of %s to %o", path, 0777^l.umask)
 	if err := os.Chmod(path, 0777^l.umask); err != nil {
 		return nil, err
 	}

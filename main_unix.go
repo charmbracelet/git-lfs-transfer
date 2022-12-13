@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/git-lfs/git-lfs/v3/git"
 )
@@ -18,17 +19,21 @@ func setPermissions(path string) os.FileMode {
 	} else {
 		config = git.NewReadOnlyConfig(path, "")
 	}
-	var umask os.FileMode
+	var val int
 	sr := config.Find("core.sharedrepository")
 	switch sr {
 	case "true", "group":
-		umask = 0660
+		val = 0660
 	case "all", "world", "everybody":
-		umask = 0664
+		val = 0664
 	case "false", "umask":
 	default:
-		val, _ := strconv.ParseUint(sr, 8, 32)
-		umask = os.FileMode(val)
+		v, _ := strconv.ParseUint(sr, 8, 32)
+		val = int(v)
 	}
-	return 0777 ^ umask
+	var umask int = 0777
+	if val != 0 {
+		umask ^= val
+	}
+	return os.FileMode(syscall.Umask(umask))
 }

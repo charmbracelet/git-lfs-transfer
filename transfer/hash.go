@@ -37,10 +37,7 @@ func (h *HashingReader) Oid() (Oid, error) {
 // Read reads data from the underlying reader and hashes it.
 func (h *HashingReader) Read(p []byte) (int, error) {
 	n, err := h.r.Read(p)
-	if err != nil {
-		return n, err
-	}
-	h.hash.Write(p[:n])
 	h.size += int64(n)
-	return n, nil
+	h.hash.Write(p[:n])
+	return n, err
 }

@@ -16,7 +16,7 @@ func ensureDirs(path string) error {
 	for _, dir := range []string{
 		"objects", "incomplete", "tmp", "locks",
 	} {
-		os.MkdirAll(filepath.Join(path, dir), 0755)
+		os.MkdirAll(filepath.Join(path, dir), 0777)
 	}
 	return nil
 }
@@ -35,11 +35,11 @@ func run(r io.Reader, w io.Writer, args []string) error {
 	if !strings.HasSuffix(path, ".git") {
 		gitdir = filepath.Join(path, ".git")
 	}
-	umask := setPermissions(gitdir)
 	lfsPath := filepath.Join(gitdir, "lfs")
-	if err := ensureDirs(path); err != nil {
+	if err := ensureDirs(lfsPath); err != nil {
 		return err
 	}
+	umask := setPermissions(gitdir)
 	handler := transfer.NewPktline(r, w)
 	if err := handler.WritePacketText("version=1"); err != nil {
 		return err
@@ -48,6 +48,7 @@ func run(r io.Reader, w io.Writer, args []string) error {
 		return err
 	}
 	now := time.Now()
+	transfer.Logf("umask %o", umask)
 	backend := local.New(lfsPath, umask, &now)
 	p := transfer.NewProcessor(handler, backend)
 	switch op {

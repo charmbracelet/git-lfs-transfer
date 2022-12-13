@@ -7,8 +7,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 
+	"github.com/charmbracelet/git-lfs-transfer/transfer"
 	"github.com/git-lfs/git-lfs/v3/git"
 )
 
@@ -35,5 +35,8 @@ func setPermissions(path string) os.FileMode {
 	if val != 0 {
 		umask ^= val
 	}
-	return os.FileMode(syscall.Umask(umask))
+	// FIXME
+	transfer.Logf("setting umask to %o", umask)
+	return os.FileMode(umask)
+	// return os.FileMode(syscall.Umask(umask))
 }

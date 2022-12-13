@@ -80,14 +80,9 @@ func (l *LocalBackend) FinishUpload(state interface{}, args ...string) error {
 		if err := os.MkdirAll(parent, 0777); err != nil {
 			return err
 		}
-		f, err := os.Open(destPath)
-		if err != nil {
-			return fmt.Errorf("failed to open file %w", err)
+		if err := os.Link(state.TempFile.Name(), destPath); err != nil {
+			return err
 		}
-		if _, err := io.Copy(f, state.TempFile); err != nil {
-			return fmt.Errorf("failed to copy temp file data to file %w", err)
-		}
-		defer f.Close()
 		defer state.TempFile.Close()
 		if _, err := l.FixPermissions(destPath); err != nil {
 			return err

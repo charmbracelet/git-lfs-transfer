@@ -145,11 +145,6 @@ func (p *Processor) PutObject(oid Oid) (Status, error) {
 	}
 	r := p.handler.ReaderWithSize(int(expectedSize))
 	rdr := NewHashingReader(r, sha256.New())
-	bts, err := io.ReadAll(rdr)
-	if err != nil {
-		return nil, err
-	}
-	Logf("hash reader %d %s", rdr.Size(), bts)
 	state, err := p.backend.StartUpload(oid, rdr)
 	if err != nil {
 		return nil, err
@@ -187,7 +182,7 @@ func (p *Processor) VerifyObject(oid Oid) (Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
-	return p.backend.Verify(oid, ArgsToList(args)...)
+	return p.backend.Verify(oid, args)
 }
 
 // GetObject writes an object ID to the transfer protocol.

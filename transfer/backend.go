@@ -37,7 +37,7 @@ type Backend interface {
 	Batch(op Operation, oids []OidWithSize) ([]BatchItem, error)
 	StartUpload(oid Oid, r io.Reader, args ...string) (interface{}, error)
 	FinishUpload(state interface{}, args ...string) error
-	Verify(oid Oid, args ...string) (Status, error)
+	Verify(oid Oid, args map[string]string) (Status, error)
 	Download(oid Oid, args ...string) (*File, error)
 	LockBackend() LockBackend
 }

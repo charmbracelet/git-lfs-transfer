@@ -132,13 +132,11 @@ func (l *LocalBackend) StartUpload(oid transfer.Oid, r io.Reader, args ...string
 }
 
 // Verify implements main.Backend.
-func (l *LocalBackend) Verify(oid transfer.Oid, args ...string) (transfer.Status, error) {
+func (l *LocalBackend) Verify(oid transfer.Oid, args map[string]string) (transfer.Status, error) {
 	var expectedSize int
-	for i := 0; i < len(args); i += 2 {
-		if args[i] == "size" {
-			expectedSize, _ = strconv.Atoi(args[i+1])
-			break
-		}
+	size, ok := args[transfer.SizeKey]
+	if ok {
+		expectedSize, _ = strconv.Atoi(size)
 	}
 	if expectedSize == 0 {
 		return nil, fmt.Errorf("missing size argument")
@@ -148,6 +146,7 @@ func (l *LocalBackend) Verify(oid transfer.Oid, args ...string) (transfer.Status
 		return nil, err
 	}
 	if stat.Size() != int64(expectedSize) {
+		transfer.Logf("size mismatch, expected %d, got %d", expectedSize, stat.Size())
 		return transfer.NewFailureStatus(transfer.StatusConflict, "size mismatch"), nil
 	}
 	return transfer.SuccessStatus(), nil

@@ -5,6 +5,7 @@ package main
 
 import (
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 
@@ -37,4 +38,8 @@ func setPermissions(path string) os.FileMode {
 		umask = 0777 &^ val
 	}
 	return os.FileMode(umask)
+}
+
+func setup(c chan os.Signal) {
+	signal.Notify(c, os.Interrupt, unix.SIGTERM, unix.SIGPIPE)
 }

@@ -419,7 +419,9 @@ func (p *Processor) ProcessCommands(op Operation) error {
 				err = p.handler.SendError(StatusBadRequest, "unknown command")
 			}
 		case quitCommand:
-			p.handler.SendStatus(SuccessStatus())
+			if err := p.handler.SendStatus(SuccessStatus()); err != nil {
+				Logf("error pktline sending status: %v", err)
+			}
 			return nil
 		default:
 			err = p.handler.SendError(StatusBadRequest, "unknown command")

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -70,16 +71,35 @@ Usage:
 }
 
 func main() {
+	done := make(chan os.Signal, 1)
+	errc := make(chan error, 1)
+
+	setup(done)
 	if debug := os.Getenv("GIT_LFS_TRANSFER_DEBUG"); debug == "true" {
 		transfer.Debug = true
 	}
 
 	transfer.Logf("git-lfs-transfer %s", "v1")
 	defer transfer.Log("git-lfs-transfer completed")
-	if err := run(os.Stdin, os.Stdout, os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, usage())
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	go func() {
+		errc <- run(os.Stdin, os.Stdout, os.Args[1:])
+	}()
+
+	select {
+	case s := <-done:
+		transfer.Logf("signal %q received", s)
+	case err := <-errc:
+		transfer.Log("done running")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, usage())
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintln(os.Stderr, err)
+			switch {
+			case errors.Is(err, transfer.ErrConflict):
+				os.Exit(1)
+			default:
+				os.Exit(2)
+			}
+		}
 	}
 }

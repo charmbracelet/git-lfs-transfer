@@ -10,3 +10,5 @@ import (
 func setPermissions(path string) os.FileMode {
 	return 0077
 }
+
+func setup(c chan os.Signal) {}

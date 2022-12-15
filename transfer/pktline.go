@@ -64,9 +64,11 @@ func (p *Pktline) SendError(status uint32, message string) error {
 func (p *Pktline) SendStatus(status Status) error {
 	Logf("sending status: %s", status)
 	if err := p.WritePacketText(fmt.Sprintf("status %03d", status.Code())); err != nil {
+		Logf("error writing status: %s", err)
 		return err
 	}
 	if args := status.Args(); len(args) > 0 {
+		Logf("sending args %v", args)
 		for _, arg := range args {
 			if err := p.WritePacketText(arg); err != nil {
 				return err
@@ -74,6 +76,7 @@ func (p *Pktline) SendStatus(status Status) error {
 		}
 	}
 	if msgs := status.Messages(); len(msgs) > 0 {
+		Logf("sending msgs %v", msgs)
 		if err := p.WriteDelim(); err != nil {
 			return err
 		}
@@ -83,37 +86,43 @@ func (p *Pktline) SendStatus(status Status) error {
 			}
 		}
 	} else if r := status.Reader(); r != nil {
+		Logf("sending reader")
 		// Close reader if it implements io.Closer.
 		if c, ok := r.(io.Closer); ok {
 			defer c.Close()
 		}
 		if err := p.WriteDelim(); err != nil {
+			Logf("error writing delim: %v", err)
 			return err
 		}
-		if _, err := io.Copy(p.Writer(), r); err != nil {
+		w := p.Writer()
+		if _, err := io.Copy(w, r); err != nil {
+			Logf("error copying reader: %v", err)
 			return err
 		}
+		defer Logf("done copying")
+		return w.Flush()
 	}
 	return p.WriteFlush()
 }
 
 // Reader returns a reader for the packet line.
-func (p *Pktline) Reader() io.Reader {
+func (p *Pktline) Reader() *pktline.PktlineReader {
 	return p.ReaderWithSize(pktline.MaxPacketLength)
 }
 
 // ReaderWithSize returns a reader for the packet line with the given size.
-func (p *Pktline) ReaderWithSize(size int) io.Reader {
+func (p *Pktline) ReaderWithSize(size int) *pktline.PktlineReader {
 	return pktline.NewPktlineReaderFromPktline(p.Pktline, size)
 }
 
 // Writer returns a writer for the packet line.
-func (p *Pktline) Writer() io.Writer {
+func (p *Pktline) Writer() *pktline.PktlineWriter {
 	return p.WriterWithSize(pktline.MaxPacketLength)
 }
 
 // WriterWithSize returns a writer for the packet line with the given size.
-func (p *Pktline) WriterWithSize(size int) io.Writer {
+func (p *Pktline) WriterWithSize(size int) *pktline.PktlineWriter {
 	return pktline.NewPktlineWriterFromPktline(p.Pktline, size)
 }
 

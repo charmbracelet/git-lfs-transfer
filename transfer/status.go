@@ -46,6 +46,9 @@ func (s status) String() string {
 	fmt.Fprintf(&b, "status %d ", s.code)
 	fmt.Fprintf(&b, "args %v ", s.args)
 	fmt.Fprintf(&b, "messages %v ", s.messages)
+	if s.reader != nil {
+		fmt.Fprintf(&b, "reader %v ", s.reader)
+	}
 	return b.String()
 }
 

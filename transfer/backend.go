@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"io"
+	"io/fs"
 )
 
 // Operation is a Git LFS operation.
@@ -26,19 +27,13 @@ func (o Operation) String() string {
 	}
 }
 
-// File is a Git LFS file.
-type File struct {
-	io.Reader
-	Size int64
-}
-
 // Backend is a Git LFS backend.
 type Backend interface {
 	Batch(op Operation, oids []OidWithSize) ([]BatchItem, error)
 	StartUpload(oid Oid, r io.Reader, args ...string) (interface{}, error)
 	FinishUpload(state interface{}, args ...string) error
 	Verify(oid Oid, args map[string]string) (Status, error)
-	Download(oid Oid, args ...string) (*File, error)
+	Download(oid Oid, args ...string) (fs.File, error)
 	LockBackend() LockBackend
 }
 

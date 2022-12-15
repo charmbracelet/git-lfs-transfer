@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/git-lfs-transfer/transfer"
 	"github.com/git-lfs/git-lfs/v3/git"
+	"golang.org/x/sys/unix"
 )
 
 func setPermissions(path string) os.FileMode {
@@ -31,12 +31,10 @@ func setPermissions(path string) os.FileMode {
 		v, _ := strconv.ParseUint(sr, 8, 32)
 		val = int(v)
 	}
-	var umask int = 0777
+	umask := unix.Umask(0)
+	unix.Umask(umask)
 	if val != 0 {
-		umask ^= val
+		umask = 0777 &^ val
 	}
-	// FIXME
-	transfer.Logf("setting umask to %o", umask)
 	return os.FileMode(umask)
-	// return os.FileMode(syscall.Umask(umask))
 }

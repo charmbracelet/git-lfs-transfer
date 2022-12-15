@@ -90,8 +90,7 @@ func (p *Pktline) SendStatus(status Status) error {
 		if err := p.WriteDelim(); err != nil {
 			return err
 		}
-		w := pktline.NewPktlineWriterFromPktline(p.Pktline, 0)
-		if _, err := io.Copy(w, r); err != nil {
+		if _, err := io.Copy(p.Writer(), r); err != nil {
 			return err
 		}
 	}
@@ -100,7 +99,7 @@ func (p *Pktline) SendStatus(status Status) error {
 
 // Reader returns a reader for the packet line.
 func (p *Pktline) Reader() io.Reader {
-	return p.ReaderWithSize(0)
+	return p.ReaderWithSize(pktline.MaxPacketLength)
 }
 
 // ReaderWithSize returns a reader for the packet line with the given size.
@@ -110,7 +109,7 @@ func (p *Pktline) ReaderWithSize(size int) io.Reader {
 
 // Writer returns a writer for the packet line.
 func (p *Pktline) Writer() io.Writer {
-	return p.WriterWithSize(0)
+	return p.WriterWithSize(pktline.MaxPacketLength)
 }
 
 // WriterWithSize returns a writer for the packet line with the given size.

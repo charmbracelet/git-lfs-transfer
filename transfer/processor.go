@@ -202,7 +202,11 @@ func (p *Processor) GetObject(oid Oid) (Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewSuccessStatusWithReader(r, fmt.Sprintf("size=%d", r.Size)), nil
+	info, err := r.Stat()
+	if err != nil {
+		return nil, err
+	}
+	return NewSuccessStatusWithReader(r, fmt.Sprintf("size=%d", info.Size())), nil
 }
 
 // Lock writes a lock to the transfer protocol.

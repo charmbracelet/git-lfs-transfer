@@ -250,7 +250,6 @@ func (p *Processor) Lock() (Status, error) {
 		return NewSuccessStatusWithCode(StatusCreated, lock.AsArguments()...), nil
 	}
 	// unreachable
-	panic("unreachable")
 }
 
 // ListLocksForPath lists locks for a path. cursor can be empty.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/git-lfs-transfer/internal/local"
 	"github.com/charmbracelet/git-lfs-transfer/transfer"
+	"github.com/rubyist/tracerx"
 )
 
 func ensureDirs(path string) error {
@@ -71,15 +72,16 @@ Usage:
 `
 }
 
+func init() {
+	tracerx.DefaultKey = "GIT"
+	tracerx.Prefix = "trace git-lfs-transfer: "
+}
+
 func main() {
 	done := make(chan os.Signal, 1)
 	errc := make(chan error, 1)
 
 	setup(done)
-	if debug := os.Getenv("GIT_LFS_TRANSFER_DEBUG"); debug == "true" {
-		transfer.Debug = true
-	}
-
 	transfer.Logf("git-lfs-transfer %s", "v1")
 	defer transfer.Log("git-lfs-transfer completed")
 	go func() {

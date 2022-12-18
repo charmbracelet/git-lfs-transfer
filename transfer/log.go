@@ -1,6 +1,8 @@
 package transfer
 
-import "log"
+import (
+	"github.com/rubyist/tracerx"
+)
 
 var (
 	// Debug is the debug flag.
@@ -9,14 +11,10 @@ var (
 
 // Log logs the given arguments if Debug is true.
 func Log(v ...interface{}) {
-	if Debug {
-		log.Print(v...)
-	}
+	tracerx.Printf("%v", v...)
 }
 
 // Logf logs the given arguments if Debug is true.
 func Logf(format string, v ...interface{}) {
-	if Debug {
-		log.Printf(format, v...)
-	}
+	tracerx.Printf(format, v...)
 }

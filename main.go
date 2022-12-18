@@ -43,15 +43,16 @@ func run(r io.Reader, w io.Writer, args []string) error {
 	umask := setPermissions(gitdir)
 	handler := transfer.NewPktline(r, w)
 	if err := handler.WritePacketText("version=1"); err != nil {
-		return err
+		transfer.Logf("error sending capabilites: %v", err)
 	}
 	if err := handler.WriteFlush(); err != nil {
-		return err
+		transfer.Logf("error flushing capabilites: %v", err)
 	}
 	now := time.Now()
 	transfer.Logf("umask %o", umask)
 	backend := local.New(lfsPath, umask, &now)
 	p := transfer.NewProcessor(handler, backend)
+	defer transfer.Log("done processing commands")
 	switch op {
 	case "upload":
 		return p.ProcessCommands(transfer.UploadOperation)

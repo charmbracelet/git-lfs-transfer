@@ -27,9 +27,9 @@ func NewProcessor(line *Pktline, backend Backend) *Processor {
 
 // Version returns the version of the transfer protocol.
 func (p *Processor) Version() (Status, error) {
-	_, err := p.handler.ReadPacketText()
+	_, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
-		return nil, err
+		Logf("version error: %s", err)
 	}
 	return NewSuccessStatus([]string{}), nil
 }
@@ -143,7 +143,7 @@ func (p *Processor) PutObject(oid Oid) (Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := p.handler.ReaderWithSize(int(expectedSize))
+	r := p.handler.Reader()
 	rdr := NewHashingReader(r, sha256.New())
 	state, err := p.backend.StartUpload(oid, rdr)
 	if err != nil {
@@ -447,5 +447,6 @@ func (p *Processor) ProcessCommands(op Operation) error {
 				Logf("error pktline sending status: %v", err)
 			}
 		}
+		Log("processed command")
 	}
 }

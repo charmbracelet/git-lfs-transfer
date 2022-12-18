@@ -47,15 +47,13 @@ func NewPktline(r io.Reader, w io.Writer) *Pktline {
 func (p *Pktline) SendError(status uint32, message string) error {
 	Logf("sending error: %d %s", status, message)
 	if err := p.WritePacketText(fmt.Sprintf("status %03d", status)); err != nil {
-		return err
+		Logf("error writing status: %s", err)
 	}
-	if message != "" {
-		if err := p.WriteDelim(); err != nil {
-			return err
-		}
-		if err := p.WritePacketText(fmt.Sprintf("message %s", message)); err != nil {
-			return err
-		}
+	if err := p.WriteDelim(); err != nil {
+		Logf("error writing delim: %s", err)
+	}
+	if err := p.WritePacketText(message); err != nil {
+		Logf("error writing message: %s", err)
 	}
 	return p.WriteFlush()
 }
@@ -65,24 +63,23 @@ func (p *Pktline) SendStatus(status Status) error {
 	Logf("sending status: %s", status)
 	if err := p.WritePacketText(fmt.Sprintf("status %03d", status.Code())); err != nil {
 		Logf("error writing status: %s", err)
-		return err
 	}
 	if args := status.Args(); len(args) > 0 {
 		Logf("sending args %v", args)
 		for _, arg := range args {
 			if err := p.WritePacketText(arg); err != nil {
-				return err
+				Logf("error writing arg: %s", err)
 			}
 		}
 	}
 	if msgs := status.Messages(); len(msgs) > 0 {
 		Logf("sending msgs %v", msgs)
 		if err := p.WriteDelim(); err != nil {
-			return err
+			Logf("error writing delim: %s", err)
 		}
 		for _, msg := range msgs {
 			if err := p.WritePacketText(msg); err != nil {
-				return err
+				Logf("error writing msg: %s", err)
 			}
 		}
 	} else if r := status.Reader(); r != nil {
@@ -93,12 +90,10 @@ func (p *Pktline) SendStatus(status Status) error {
 		}
 		if err := p.WriteDelim(); err != nil {
 			Logf("error writing delim: %v", err)
-			return err
 		}
 		w := p.Writer()
 		if _, err := io.Copy(w, r); err != nil {
 			Logf("error copying reader: %v", err)
-			return err
 		}
 		defer Logf("done copying")
 		return w.Flush()

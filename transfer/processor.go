@@ -226,18 +226,27 @@ func (p *Processor) Lock() (Status, error) {
 	}
 	lockBackend := p.backend.LockBackend()
 	retried := false
-	for !retried {
+	for {
 		lock, err := lockBackend.Create(path)
 		if errors.Is(err, ErrConflict) {
-			if lock == nil {
+			Logf("lock conflict")
+			lock, err = p.backend.LockBackend().FromPath(path)
+			if err != nil {
+				Logf("lock conflict, but no lock found")
+				if retried {
+					Logf("lock conflict, but no lock found, and retried")
+					return nil, err
+				}
 				retried = true
 				continue
 			}
-			return NewFailureStatusWithArgs(StatusConflict, err.Error(), lock.AsArguments()...), nil
+			return NewFailureStatusWithArgs(StatusConflict, "conflict", lock.AsArguments()...), nil
 		}
 		if err != nil {
+			Logf("lock error: %v", err)
 			return nil, err
 		}
+		Logf("lock success: %v", lock)
 		return NewSuccessStatusWithCode(StatusCreated, lock.AsArguments()...), nil
 	}
 	// unreachable
@@ -271,12 +280,9 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
-	limit, err := strconv.Atoi(args[LimitKey])
-	if err != nil {
-		return NewSuccessStatusWithCode(StatusContinue), nil
-	}
-	if limit == 0 {
-		return nil, fmt.Errorf("%w: %s", ErrNotAllowed, "request has no limit")
+	limit, _ := strconv.Atoi(args[LimitKey])
+	if limit <= 0 {
+		limit = 100
 	} else if limit > 100 {
 		// Try to avoid DoS attacks.
 		limit = 100
@@ -300,6 +306,7 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 		if lock.ID() < cursor {
 			return nil
 		}
+		Logf("adding lock %s %s", lock.Path(), lock.ID())
 		locks = append(locks, lock)
 		return nil
 	})

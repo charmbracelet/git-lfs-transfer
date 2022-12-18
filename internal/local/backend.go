@@ -178,9 +178,14 @@ func (l *localLockBackend) Create(path string) (transfer.Lock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating local lock file: %w", err)
 	}
+	defer f.Remove()
 	defer f.Close()
-	f.Write(b.Bytes())
-	f.Persist()
+	if _, err := f.Write(b.Bytes()); err != nil {
+		return nil, err
+	}
+	if err := f.Persist(); err != nil {
+		return nil, err
+	}
 	user, err := l.UserForFile(fileName)
 	if err != nil {
 		return nil, err
@@ -214,7 +219,14 @@ func (l *localLockBackend) FromID(id string) (transfer.Lock, error) {
 // FromPath implements main.LockBackend.
 func (l *localLockBackend) FromPath(path string) (transfer.Lock, error) {
 	id := localBackendLock{}.HashFor(path)
-	return l.FromID(id)
+	lock, err := l.FromID(id)
+	if err != nil {
+		return nil, err
+	}
+	if lock.Path() != path {
+		return nil, fmt.Errorf("%w: unexpected file name", transfer.ErrCorruptData)
+	}
+	return lock, nil
 }
 
 // Unlock implements main.LockBackend.
@@ -228,10 +240,12 @@ func (l *localLockBackend) Range(f func(l transfer.Lock) error) error {
 	if err != nil {
 		return err
 	}
+	transfer.Logf("found %d locks", len(data))
 	sort.Slice(data, func(i, j int) bool {
 		return data[i].Name() < data[j].Name()
 	})
 	for _, lf := range data {
+		transfer.Logf("found lock %s", lf.Name())
 		lock, err := l.FromID(lf.Name())
 		if err != nil {
 			// TODO: handle error

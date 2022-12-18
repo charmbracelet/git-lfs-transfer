@@ -21,18 +21,18 @@ type OidWithSize struct {
 // Oid is a Git LFS object ID.
 type Oid string
 
-var oid Oid = Oid("")
-
 // NewOid creates a new Oid from bytes.
-func NewOid(b []byte) (Oid, error) {
-	if oid.Valid(b) {
-		return Oid(b), nil
+func NewOid(b string) (Oid, error) {
+	o := Oid(b)
+	if o.Valid() {
+		return o, nil
 	}
 	return Oid(""), ErrInvalidOid
 }
 
 // Valid returns true if the Oid is valid.
-func (Oid) Valid(b []byte) bool {
+func (o Oid) Valid() bool {
+	b := o.Value()
 	if len(b) != 64 {
 		return false
 	}

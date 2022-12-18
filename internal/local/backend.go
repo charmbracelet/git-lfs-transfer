@@ -155,7 +155,7 @@ type localLockBackend struct {
 }
 
 // NewLockBackend creates a new local lock backend.
-func NewLockBackend(backend transfer.Backend, lockPath string) *localLockBackend {
+func NewLockBackend(backend transfer.Backend, lockPath string) transfer.LockBackend {
 	return &localLockBackend{
 		backend:  backend,
 		lockPath: lockPath,

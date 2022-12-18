@@ -87,7 +87,7 @@ type localBackendLock struct {
 }
 
 // NewLocalBackendLock creates a new local backend lock.
-func NewLocalBackendLock(root, pathName string, time *time.Time, ownerName string) *localBackendLock {
+func NewLocalBackendLock(root, pathName string, time *time.Time, ownerName string) transfer.Lock {
 	return &localBackendLock{
 		root:      root,
 		pathName:  pathName,
@@ -119,7 +119,7 @@ func (localBackendLock) Parse(data []byte) (*time.Time, []byte, error) {
 	return &time, v[2], nil
 }
 
-// AsArguments implements main.Lock
+// AsArguments implements main.Lock.
 func (l *localBackendLock) AsArguments() []string {
 	return []string{
 		fmt.Sprintf("id=%s", l.ID()),
@@ -157,7 +157,7 @@ func (l *localBackendLock) FormattedTimestamp() string {
 	return l.time.UTC().Format(time.RFC3339)
 }
 
-// ID implements main.Lock
+// ID implements main.Lock.
 func (l *localBackendLock) ID() string {
 	return l.HashFor(l.pathName)
 }

@@ -287,8 +287,7 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 		limit = 100
 	}
 	cursor := args[CursorKey]
-	path := args[PathKey]
-	if path != "" {
+	if path, ok := args[PathKey]; ok && path != "" {
 		return p.ListLocksForPath(path, cursor, useOwnerID)
 	}
 	locks := make([]Lock, 0)

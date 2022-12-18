@@ -31,7 +31,7 @@ func (h *HashingReader) Size() int64 {
 // Oid returns the hash of the data read.
 func (h *HashingReader) Oid() (Oid, error) {
 	hex := hex.EncodeToString(h.hash.Sum(nil))
-	return NewOid([]byte(hex))
+	return NewOid(hex)
 }
 
 // Read reads data from the underlying reader and hashes it.

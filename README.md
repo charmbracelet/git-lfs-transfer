@@ -8,7 +8,7 @@ re-written in Go.
 ## Todo
 
 - [x] Basic implementation of the proposed protocol
-- [ ] Locking support
+- [x] Locking support
 - [ ] Integration tests
 
 [proposal]: https://github.com/git-lfs/git-lfs/blob/main/docs/proposals/ssh_adapter.md

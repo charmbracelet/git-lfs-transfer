@@ -176,7 +176,7 @@ func (l *localLockBackend) Create(path string) (transfer.Lock, error) {
 	fileName := filepath.Join(l.lockPath, id)
 	f, err := NewLockFile(fileName)
 	if err != nil {
-		return nil, fmt.Errorf("error creating local lock file: %v", err)
+		return nil, fmt.Errorf("error creating local lock file: %w", err)
 	}
 	defer f.Close()
 	f.Write(b.Bytes())
@@ -193,20 +193,20 @@ func (l *localLockBackend) FromID(id string) (transfer.Lock, error) {
 	fileName := filepath.Join(l.lockPath, id)
 	f, err := os.Open(fileName)
 	if err != nil {
-		return nil, fmt.Errorf("error opening local lock file: %v", err)
+		return nil, fmt.Errorf("error opening local lock file: %w", err)
 	}
 	defer f.Close()
 	b, err := io.ReadAll(f)
 	if err != nil {
-		return nil, fmt.Errorf("error reading local lock file: %v", err)
+		return nil, fmt.Errorf("error reading local lock file: %w", err)
 	}
 	time, btsPath, err := localBackendLock{}.Parse(b)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing local lock file: %v", err)
+		return nil, fmt.Errorf("error parsing local lock file: %w", err)
 	}
 	user, err := l.UserForFile(fileName)
 	if err != nil {
-		return nil, fmt.Errorf("error getting user for local lock file: %v", err)
+		return nil, fmt.Errorf("error getting user for local lock file: %w", err)
 	}
 	return NewLocalBackendLock(l.lockPath, string(btsPath), time, user), nil
 }

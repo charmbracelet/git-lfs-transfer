@@ -87,7 +87,7 @@ func init() {
 }
 
 // Command is the main git-lfs-transfer entry.
-func Command(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+func Command(stdin io.Reader, stdout io.Writer, stderr io.Writer, args ...string) error {
 	done := make(chan os.Signal, 1)
 	errc := make(chan error, 1)
 
@@ -95,7 +95,7 @@ func Command(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 	transfer.Logf("git-lfs-transfer %s", "v1")
 	defer transfer.Log("git-lfs-transfer completed")
 	go func() {
-		errc <- run(stdin, stdout, os.Args[1:])
+		errc <- run(stdin, stdout, args)
 	}()
 
 	select {
@@ -103,6 +103,9 @@ func Command(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 		transfer.Logf("signal %q received", s)
 	case err := <-errc:
 		transfer.Log("done running")
+		fmt.Fprintf(stderr, Usage())
+		fmt.Fprintln(stderr)
+		fmt.Fprintln(stderr, err)
 		if err != nil {
 			return err
 		}

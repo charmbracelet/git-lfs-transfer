@@ -65,7 +65,6 @@ func (p *Pktline) SendStatus(status Status) error {
 		Logf("error writing status: %s", err)
 	}
 	if args := status.Args(); len(args) > 0 {
-		Logf("sending args %v", args)
 		for _, arg := range args {
 			if err := p.WritePacketText(arg); err != nil {
 				Logf("error writing arg: %s", err)
@@ -73,7 +72,6 @@ func (p *Pktline) SendStatus(status Status) error {
 		}
 	}
 	if msgs := status.Messages(); len(msgs) > 0 {
-		Logf("sending msgs %v", msgs)
 		if err := p.WriteDelim(); err != nil {
 			Logf("error writing delim: %s", err)
 		}

@@ -1,17 +1,43 @@
-# git-lfs-transfer
+# Git LFS Transfer
 
-`git-lfs-transfer` is a server-side implementation of the proposed [Git LFS pure SSH-based protocol][proposal].
-It is intended to be invoked over SSH to transfer Git LFS objects. This was
-originally ported from [bk2204/scutiger](https://github.com/bk2204/scutiger) and
-re-written in Go.
+![](https://stuff.charm.sh/soft-serve/git-lfs-transfer.png)
 
-## Todo
+A server-side implementation of the [Git LFS pure SSH-based protocol proposal](https://github.com/git-lfs/git-lfs/blob/main/docs/proposals/ssh_adapter.md).
 
-- [x] Basic implementation of the proposed protocol
-- [x] Locking support
-- [ ] Integration tests
+`git-lfs-transfer` transfers large files stored in Git over SSH.
 
-[proposal]: https://github.com/git-lfs/git-lfs/blob/main/docs/proposals/ssh_adapter.md
+## Installation
+
+```bash
+go install github.com/charmbracelet/git-lfs-transfer@latest
+```
+
+## Usage
+
+```bash
+# Usage
+git-lfs-transfer <Path> <Operation>
+
+# Example
+git-lfs-transfer large-file.mp4 upload
+git-lfs-transfer large-file.mp4 download
+```
+
+## Acknowledgements
+
+This library implements the [Git LFS pure SSH-based protocol proposal](https://github.com/git-lfs/git-lfs/blob/main/docs/proposals/ssh_adapter.md).
+
+This library is ported from [Brian Carlson](https://github.com/bk2204)'s
+library, [`scrutiger`](https://github.com/bk2204/scutiger), and has been
+rewritten in Go.
+
+## Feedback
+
+We'd love to hear your thoughts on this project. Feel free to drop us a note!
+
+* [Twitter](https://twitter.com/charmcli)
+* [The Fediverse](https://mastodon.social/@charmcli)
+* [Discord](https://charm.sh/chat)
 
 ## License
 

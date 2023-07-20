@@ -84,7 +84,7 @@ func (p *Pktline) SendStatus(status Status) error {
 		Logf("sending reader")
 		// Close reader if it implements io.Closer.
 		if c, ok := r.(io.Closer); ok {
-			defer c.Close()
+			defer c.Close() // nolint: errcheck
 		}
 		if err := p.WriteDelim(); err != nil {
 			Logf("error writing delim: %v", err)

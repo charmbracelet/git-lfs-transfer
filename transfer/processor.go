@@ -40,7 +40,7 @@ func (p *Processor) Error(code uint32, message string) (Status, error) {
 }
 
 // ReadBatch reads a batch request.
-func (p *Processor) ReadBatch(op Operation) ([]BatchItem, error) {
+func (p *Processor) ReadBatch(op string) ([]BatchItem, error) {
 	ar, err := p.handler.ReadPacketListToDelim()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
@@ -61,7 +61,7 @@ func (p *Processor) ReadBatch(op Operation) ([]BatchItem, error) {
 	}
 	Logf("data: %d %v", len(data), data)
 	Logf("batch: %s args: %d %v data: %d %v", op, len(args), args, len(data), data)
-	items := make([]OidWithSize, 0)
+	items := make([]Pointer, 0)
 	for _, line := range data {
 		if line == "" {
 			return nil, ErrInvalidPacket
@@ -70,13 +70,13 @@ func (p *Processor) ReadBatch(op Operation) ([]BatchItem, error) {
 		if len(parts) != 2 || parts[1] == "" {
 			return nil, ErrParseError
 		}
-		size, err := strconv.Atoi(parts[1])
+		size, err := strconv.ParseInt(parts[1], 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid integer, got: %q", ErrParseError, parts[1])
 		}
-		item := OidWithSize{
-			Oid(parts[0]),
-			int64(size),
+		item := Pointer{
+			parts[0],
+			size,
 		}
 		items = append(items, item)
 	}
@@ -90,7 +90,7 @@ func (p *Processor) ReadBatch(op Operation) ([]BatchItem, error) {
 }
 
 // BatchData writes batch data to the transfer protocol.
-func (p *Processor) BatchData(op Operation, presentAction string, missingAction string) (Status, error) {
+func (p *Processor) BatchData(op string, presentAction string, missingAction string) (Status, error) {
 	batch, err := p.ReadBatch(op)
 	if err != nil {
 		return p.Error(StatusBadRequest, err.Error())
@@ -122,15 +122,15 @@ func (Processor) SizeFromArgs(args map[string]string) (int64, error) {
 	if !ok {
 		return 0, fmt.Errorf("missing required size header")
 	}
-	n, err := strconv.Atoi(size)
+	n, err := strconv.ParseInt(size, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("invalid size: %w", err)
 	}
-	return int64(n), nil
+	return n, nil
 }
 
 // PutObject writes an object ID to the transfer protocol.
-func (p *Processor) PutObject(oid Oid) (Status, error) {
+func (p *Processor) PutObject(oid string) (Status, error) {
 	ar, err := p.handler.ReadPacketListToDelim()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
@@ -159,11 +159,7 @@ func (p *Processor) PutObject(oid Oid) (Status, error) {
 		}
 		return nil, err
 	}
-	actualOid, err := rdr.Oid()
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrCorruptData, err)
-	}
-	if actualOid != oid {
+	if actualOid := rdr.Oid(); actualOid != oid {
 		return nil, fmt.Errorf("%w: %s", ErrCorruptData, fmt.Sprintf("invalid object ID, expected %s, got %s", oid, actualOid))
 	}
 	if err := p.backend.FinishUpload(state); err != nil {
@@ -173,7 +169,7 @@ func (p *Processor) PutObject(oid Oid) (Status, error) {
 }
 
 // VerifyObject verifies an object ID.
-func (p *Processor) VerifyObject(oid Oid) (Status, error) {
+func (p *Processor) VerifyObject(oid string) (Status, error) {
 	ar, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
@@ -186,7 +182,7 @@ func (p *Processor) VerifyObject(oid Oid) (Status, error) {
 }
 
 // GetObject writes an object ID to the transfer protocol.
-func (p *Processor) GetObject(oid Oid) (Status, error) {
+func (p *Processor) GetObject(oid string) (Status, error) {
 	ar, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
@@ -292,7 +288,7 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 	}
 	locks := make([]Lock, 0)
 	lb := p.backend.LockBackend()
-	lb.Range(func(lock Lock) error {
+	if err := lb.Range(func(lock Lock) error {
 		if len(locks) >= limit+1 {
 			// stop iterating when limit is reached.
 			return io.EOF
@@ -307,7 +303,11 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 		Logf("adding lock %s %s", lock.Path(), lock.ID())
 		locks = append(locks, lock)
 		return nil
-	})
+	}); err != nil {
+		if err != io.EOF {
+			return nil, err
+		}
+	}
 	msgs := make([]string, 0, len(locks))
 	for _, item := range locks {
 		specs, err := item.AsLockSpec(useOwnerID)
@@ -347,7 +347,7 @@ func (p *Processor) Unlock(id string) (Status, error) {
 }
 
 // ProcessCommands processes commands from the transfer protocol.
-func (p *Processor) ProcessCommands(op Operation) error {
+func (p *Processor) ProcessCommands(op string) error {
 	Log("processing commands")
 	for {
 		pkt, err := p.handler.ReadPacketText()
@@ -388,22 +388,24 @@ func (p *Processor) ProcessCommands(op Operation) error {
 			case DownloadOperation:
 				Logf("download batch command received")
 				status, err = p.DownloadBatch()
+			default:
+				err = p.handler.SendError(StatusBadRequest, "unknown operation")
 			}
 		case putObjectCommand:
 			if len(msgs) > 1 {
-				status, err = p.PutObject(Oid(msgs[1]))
+				status, err = p.PutObject(msgs[1])
 			} else {
 				err = p.handler.SendError(StatusForbidden, "not allowed")
 			}
 		case verifyObjectCommand:
 			if len(msgs) > 1 {
-				status, err = p.VerifyObject(Oid(msgs[1]))
+				status, err = p.VerifyObject(msgs[1])
 			} else {
 				err = p.handler.SendError(StatusForbidden, "not allowed")
 			}
 		case getObjectCommand:
 			if len(msgs) > 1 {
-				status, err = p.GetObject(Oid(msgs[1]))
+				status, err = p.GetObject(msgs[1])
 			} else {
 				err = p.handler.SendError(StatusForbidden, "not allowed")
 			}

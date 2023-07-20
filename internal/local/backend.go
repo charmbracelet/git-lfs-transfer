@@ -3,6 +3,7 @@ package local
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/git-lfs-transfer/transfer"
@@ -17,8 +19,15 @@ import (
 
 var _ transfer.Backend = &LocalBackend{}
 
+func oidExpectedPath(root, oid string) string {
+	p := transfer.Pointer{Oid: oid}
+	rp := p.RelativePath()
+	rp = strings.ReplaceAll(rp, "/", string(filepath.Separator))
+	return filepath.Join(root, "objects", rp)
+}
+
 // LocalBackend is a local Git LFS backend.
-type LocalBackend struct {
+type LocalBackend struct { // nolint: revive
 	lfsPath   string
 	umask     fs.FileMode
 	timestamp *time.Time
@@ -33,21 +42,18 @@ func New(lfsPath string, umask os.FileMode, timestamp *time.Time) *LocalBackend 
 	}
 }
 
-// Batch implements main.Backend
-func (l *LocalBackend) Batch(_ transfer.Operation, oids []transfer.OidWithSize) ([]transfer.BatchItem, error) {
+// Batch implements main.Backend.
+func (l *LocalBackend) Batch(_ string, pointers []transfer.Pointer) ([]transfer.BatchItem, error) {
 	items := make([]transfer.BatchItem, 0)
-	for _, o := range oids {
-		oid := o.Oid
-		size := o.Size
+	for _, o := range pointers {
 		present := false
-		stat, err := oid.Stat(l.lfsPath)
+		stat, err := os.Stat(oidExpectedPath(l.lfsPath, o.Oid))
 		if err == nil {
-			size = stat.Size()
+			o.Size = stat.Size()
 			present = true
 		}
 		items = append(items, transfer.BatchItem{
-			Oid:     oid,
-			Size:    size,
+			Pointer: o,
 			Present: present,
 		})
 	}
@@ -56,9 +62,8 @@ func (l *LocalBackend) Batch(_ transfer.Operation, oids []transfer.OidWithSize) 
 
 // Download implements main.Backend. The returned reader must be closed by the
 // caller.
-func (l *LocalBackend) Download(oid transfer.Oid, args ...string) (fs.File, error) {
-	path := oid.ExpectedPath(l.lfsPath)
-	f, err := os.Open(path)
+func (l *LocalBackend) Download(oid string, _ ...string) (fs.File, error) {
+	f, err := os.Open(oidExpectedPath(l.lfsPath, oid))
 	if err != nil {
 		return nil, err
 	}
@@ -66,10 +71,10 @@ func (l *LocalBackend) Download(oid transfer.Oid, args ...string) (fs.File, erro
 }
 
 // FinishUpload implements main.Backend.
-func (l *LocalBackend) FinishUpload(state interface{}, args ...string) error {
+func (l *LocalBackend) FinishUpload(state interface{}, _ ...string) error {
 	switch state := state.(type) {
 	case *UploadState:
-		destPath := state.Oid.ExpectedPath(l.lfsPath)
+		destPath := oidExpectedPath(l.lfsPath, state.Oid)
 		parent := filepath.Dir(destPath)
 		transfer.Logf("finishing upload of %s at %s", destPath, parent)
 		if err := os.MkdirAll(parent, 0777); err != nil {
@@ -78,7 +83,7 @@ func (l *LocalBackend) FinishUpload(state interface{}, args ...string) error {
 		if err := os.Link(state.TempFile.Name(), destPath); err != nil {
 			return err
 		}
-		defer state.TempFile.Close()
+		defer state.TempFile.Close() // nolint: errcheck
 		if _, err := l.FixPermissions(destPath); err != nil {
 			return err
 		}
@@ -96,12 +101,12 @@ func (l *LocalBackend) LockBackend() transfer.LockBackend {
 
 // UploadState is a state for an upload.
 type UploadState struct {
-	Oid      transfer.Oid
+	Oid      string
 	TempFile *os.File
 }
 
 // StartUpload implements main.Backend. The returned temp file should be closed.
-func (l *LocalBackend) StartUpload(oid transfer.Oid, r io.Reader, args ...string) (interface{}, error) {
+func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ ...string) (interface{}, error) {
 	if r == nil {
 		return nil, fmt.Errorf("%w: received null data", transfer.ErrMissingData)
 	}
@@ -127,7 +132,7 @@ func (l *LocalBackend) StartUpload(oid transfer.Oid, r io.Reader, args ...string
 }
 
 // Verify implements main.Backend.
-func (l *LocalBackend) Verify(oid transfer.Oid, args map[string]string) (transfer.Status, error) {
+func (l *LocalBackend) Verify(oid string, args map[string]string) (transfer.Status, error) {
 	var expectedSize int
 	size, ok := args[transfer.SizeKey]
 	if ok {
@@ -136,7 +141,7 @@ func (l *LocalBackend) Verify(oid transfer.Oid, args map[string]string) (transfe
 	if expectedSize == 0 {
 		return nil, fmt.Errorf("missing size argument")
 	}
-	stat, err := oid.Stat(l.lfsPath)
+	stat, err := os.Stat(oidExpectedPath(l.lfsPath, oid))
 	if err != nil {
 		return nil, err
 	}
@@ -178,8 +183,8 @@ func (l *localLockBackend) Create(path string) (transfer.Lock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating local lock file: %w", err)
 	}
-	defer f.Remove()
-	defer f.Close()
+	defer f.Remove() // nolint: errcheck
+	defer f.Close()  // nolint: errcheck
 	if _, err := f.Write(b.Bytes()); err != nil {
 		return nil, err
 	}
@@ -200,7 +205,7 @@ func (l *localLockBackend) FromID(id string) (transfer.Lock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error opening local lock file: %w", err)
 	}
-	defer f.Close()
+	defer f.Close() // nolint: errcheck
 	b, err := io.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("error reading local lock file: %w", err)
@@ -236,6 +241,7 @@ func (localLockBackend) Unlock(lock transfer.Lock) error {
 
 // Range implements main.LockBackend. Iterate over all locks. Returning an error will break and return.
 func (l *localLockBackend) Range(f func(l transfer.Lock) error) error {
+	var err error
 	data, err := os.ReadDir(l.lockPath)
 	if err != nil {
 		return err
@@ -246,14 +252,14 @@ func (l *localLockBackend) Range(f func(l transfer.Lock) error) error {
 	})
 	for _, lf := range data {
 		transfer.Logf("found lock %s", lf.Name())
-		lock, err := l.FromID(lf.Name())
+		var lock transfer.Lock
+		lock, err = l.FromID(lf.Name())
 		if err != nil {
-			// TODO: handle error
-			continue
+			err = errors.Join(err, fmt.Errorf("error reading lock %s: %w", lf.Name(), err))
 		}
 		if err := f(lock); err != nil {
 			return err
 		}
 	}
-	return nil
+	return err
 }

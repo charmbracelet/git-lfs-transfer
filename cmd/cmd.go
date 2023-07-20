@@ -24,7 +24,9 @@ func ensureDirs(path string) error {
 	for _, dir := range []string{
 		"objects", "incomplete", "tmp", "locks",
 	} {
-		os.MkdirAll(filepath.Join(path, dir), 0777)
+		if err := os.MkdirAll(filepath.Join(path, dir), os.ModePerm); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -103,8 +105,7 @@ func Command(stdin io.Reader, stdout io.Writer, stderr io.Writer, args ...string
 		transfer.Logf("signal %q received", s)
 	case err := <-errc:
 		transfer.Log("done running")
-		fmt.Fprintf(stderr, Usage())
-		fmt.Fprintln(stderr)
+		fmt.Fprintln(stderr, Usage())
 		fmt.Fprintln(stderr, err)
 		if err != nil {
 			return err

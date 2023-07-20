@@ -5,35 +5,20 @@ import (
 	"io/fs"
 )
 
-// Operation is a Git LFS operation.
-type Operation int
-
 const (
 	// UploadOperation is an upload operation.
-	UploadOperation Operation = iota
+	UploadOperation = "upload"
 	// DownloadOperation is a download operation.
-	DownloadOperation
+	DownloadOperation = "download"
 )
-
-// String returns the string representation of the Operation.
-func (o Operation) String() string {
-	switch o {
-	case UploadOperation:
-		return "upload"
-	case DownloadOperation:
-		return "download"
-	default:
-		return "unknown"
-	}
-}
 
 // Backend is a Git LFS backend.
 type Backend interface {
-	Batch(op Operation, oids []OidWithSize) ([]BatchItem, error)
-	StartUpload(oid Oid, r io.Reader, args ...string) (interface{}, error)
+	Batch(op string, pointers []Pointer) ([]BatchItem, error)
+	StartUpload(oid string, r io.Reader, args ...string) (interface{}, error)
 	FinishUpload(state interface{}, args ...string) error
-	Verify(oid Oid, args map[string]string) (Status, error)
-	Download(oid Oid, args ...string) (fs.File, error)
+	Verify(oid string, args map[string]string) (Status, error)
+	Download(oid string, args ...string) (fs.File, error)
 	LockBackend() LockBackend
 }
 

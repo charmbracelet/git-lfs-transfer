@@ -35,7 +35,9 @@ type Lock interface {
 
 // LockBackend is a Git LFS lock backend.
 type LockBackend interface {
-	Create(path string) (Lock, error)
+	// Create creates a lock for the given path and refname.
+	// Refname can be empty.
+	Create(path, refname string) (Lock, error)
 	Unlock(lock Lock) error
 	FromPath(path string) (Lock, error)
 	FromID(id string) (Lock, error)

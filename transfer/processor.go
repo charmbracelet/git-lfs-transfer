@@ -216,14 +216,14 @@ func (p *Processor) Lock() (Status, error) {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
 	path := args[PathKey]
-	// refname := args[RefnameKey]
+	refname := args[RefnameKey]
 	if path == "" {
 		return nil, fmt.Errorf("%w: %s", ErrMissingData, "path and refname are required")
 	}
 	lockBackend := p.backend.LockBackend()
 	retried := false
 	for {
-		lock, err := lockBackend.Create(path)
+		lock, err := lockBackend.Create(path, refname)
 		if errors.Is(err, ErrConflict) {
 			Logf("lock conflict")
 			lock, err = p.backend.LockBackend().FromPath(path)

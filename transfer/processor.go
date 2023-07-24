@@ -81,7 +81,7 @@ func (p *Processor) ReadBatch(op string) ([]BatchItem, error) {
 		items = append(items, item)
 	}
 	Logf("items %v", items)
-	its, err := p.backend.Batch(op, items)
+	its, err := p.backend.Batch(op, items, ArgsToList(args)...)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (p *Processor) PutObject(oid string) (Status, error) {
 	}
 	r := p.handler.Reader()
 	rdr := NewHashingReader(r, sha256.New())
-	state, err := p.backend.StartUpload(oid, rdr)
+	state, err := p.backend.StartUpload(oid, rdr, ArgsToList(args)...)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func (p *Processor) PutObject(oid string) (Status, error) {
 	if actualOid := rdr.Oid(); actualOid != oid {
 		return nil, fmt.Errorf("%w: %s", ErrCorruptData, fmt.Sprintf("invalid object ID, expected %s, got %s", oid, actualOid))
 	}
-	if err := p.backend.FinishUpload(state); err != nil {
+	if err := p.backend.FinishUpload(state, ArgsToList(args)...); err != nil {
 		return nil, err
 	}
 	return SuccessStatus(), nil

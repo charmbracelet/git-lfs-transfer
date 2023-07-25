@@ -81,7 +81,7 @@ func (p *Processor) ReadBatch(op string) ([]BatchItem, error) {
 		items = append(items, item)
 	}
 	Logf("items %v", items)
-	its, err := p.backend.Batch(op, items, ArgsToList(args)...)
+	its, err := p.backend.Batch(op, items, args)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (p *Processor) PutObject(oid string) (Status, error) {
 	}
 	r := p.handler.Reader()
 	rdr := NewHashingReader(r, sha256.New())
-	state, err := p.backend.StartUpload(oid, rdr, ArgsToList(args)...)
+	state, err := p.backend.StartUpload(oid, rdr, args)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func (p *Processor) PutObject(oid string) (Status, error) {
 	if actualOid := rdr.Oid(); actualOid != oid {
 		return nil, fmt.Errorf("%w: %s", ErrCorruptData, fmt.Sprintf("invalid object ID, expected %s, got %s", oid, actualOid))
 	}
-	if err := p.backend.FinishUpload(state, ArgsToList(args)...); err != nil {
+	if err := p.backend.FinishUpload(state, args); err != nil {
 		return nil, err
 	}
 	return SuccessStatus(), nil
@@ -191,7 +191,7 @@ func (p *Processor) GetObject(oid string) (Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
-	r, err := p.backend.Download(oid, ArgsToList(args)...)
+	r, err := p.backend.Download(oid, args)
 	if errors.Is(err, fs.ErrNotExist) {
 		return NewFailureStatus(StatusNotFound, fmt.Sprintf("object %s not found", oid)), nil
 	}
@@ -220,13 +220,13 @@ func (p *Processor) Lock() (Status, error) {
 	if path == "" {
 		return nil, fmt.Errorf("%w: %s", ErrMissingData, "path and refname are required")
 	}
-	lockBackend := p.backend.LockBackend()
+	lockBackend := p.backend.LockBackend(args)
 	retried := false
 	for {
 		lock, err := lockBackend.Create(path, refname)
 		if errors.Is(err, ErrConflict) {
 			Logf("lock conflict")
-			lock, err = p.backend.LockBackend().FromPath(path)
+			lock, err = lockBackend.FromPath(path)
 			if err != nil {
 				Logf("lock conflict, but no lock found")
 				if retried {
@@ -249,8 +249,8 @@ func (p *Processor) Lock() (Status, error) {
 }
 
 // ListLocksForPath lists locks for a path. cursor can be empty.
-func (p *Processor) ListLocksForPath(path string, cursor string, useOwnerID bool) (Status, error) {
-	lock, err := p.backend.LockBackend().FromPath(path)
+func (p *Processor) ListLocksForPath(path string, cursor string, useOwnerID bool, args map[string]string) (Status, error) {
+	lock, err := p.backend.LockBackend(args).FromPath(path)
 	if err != nil {
 		return nil, err
 	}
@@ -271,25 +271,29 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
+
 	args, err := ParseArgs(ar)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
+
 	limit, _ := strconv.Atoi(args[LimitKey])
 	if limit <= 0 {
-		limit = 100
+		limit = 20
 	} else if limit > 100 {
 		// Try to avoid DoS attacks.
 		limit = 100
 	}
+
 	cursor := args[CursorKey]
 	if path, ok := args[PathKey]; ok && path != "" {
-		return p.ListLocksForPath(path, cursor, useOwnerID)
+		return p.ListLocksForPath(path, cursor, useOwnerID, args)
 	}
+
 	locks := make([]Lock, 0)
-	lb := p.backend.LockBackend()
-	if err := lb.Range(func(lock Lock) error {
-		if len(locks) >= limit+1 {
+	lb := p.backend.LockBackend(args)
+	nextCursor, err := lb.Range(cursor, limit, func(lock Lock) error {
+		if len(locks) >= limit {
 			// stop iterating when limit is reached.
 			return io.EOF
 		}
@@ -297,17 +301,16 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 			// skip nil locks
 			return nil
 		}
-		if lock.ID() < cursor {
-			return nil
-		}
 		Logf("adding lock %s %s", lock.Path(), lock.ID())
 		locks = append(locks, lock)
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		if err != io.EOF {
 			return nil, err
 		}
 	}
+
 	msgs := make([]string, 0, len(locks))
 	for _, item := range locks {
 		specs, err := item.AsLockSpec(useOwnerID)
@@ -316,21 +319,30 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 		}
 		msgs = append(msgs, specs...)
 	}
-	nextCursor := ""
-	if len(locks) == limit+1 {
-		nextCursor = fmt.Sprintf("next-cursor=%s", locks[limit].ID())
+
+	dataArgs := []string{}
+	if nextCursor != "" {
+		dataArgs = append(dataArgs, fmt.Sprintf("next-cursor=%s", nextCursor))
 	}
-	return NewSuccessStatusWithData(StatusAccepted, msgs, nextCursor), nil
+
+	return NewSuccessStatusWithData(StatusAccepted, msgs, dataArgs...), nil
 }
 
 // Unlock unlocks a lock.
 func (p *Processor) Unlock(id string) (Status, error) {
-	_, _ = p.handler.ReadPacket()
-	lock, err := p.backend.LockBackend().FromID(id)
+	ar, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	args, err := ParseArgs(ar)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	lock, err := p.backend.LockBackend(args).FromID(id)
+	if err != nil && !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
-	if lock == nil {
+	if lock == nil || errors.Is(err, ErrNotFound) {
 		return p.Error(StatusNotFound, fmt.Sprintf("lock %s not found", id))
 	}
 	if err := lock.Unlock(); err != nil {

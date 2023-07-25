@@ -14,12 +14,12 @@ const (
 
 // Backend is a Git LFS backend.
 type Backend interface {
-	Batch(op string, pointers []Pointer, args ...string) ([]BatchItem, error)
-	StartUpload(oid string, r io.Reader, args ...string) (interface{}, error)
-	FinishUpload(state interface{}, args ...string) error
+	Batch(op string, pointers []Pointer, args map[string]string) ([]BatchItem, error)
+	StartUpload(oid string, r io.Reader, args map[string]string) (interface{}, error)
+	FinishUpload(state interface{}, args map[string]string) error
 	Verify(oid string, args map[string]string) (Status, error)
-	Download(oid string, args ...string) (fs.File, error)
-	LockBackend() LockBackend
+	Download(oid string, args map[string]string) (fs.File, error)
+	LockBackend(args map[string]string) LockBackend
 }
 
 // Lock is a Git LFS lock.
@@ -41,5 +41,5 @@ type LockBackend interface {
 	Unlock(lock Lock) error
 	FromPath(path string) (Lock, error)
 	FromID(id string) (Lock, error)
-	Range(func(Lock) error) error
+	Range(cursor string, limit int, iter func(Lock) error) (string, error)
 }

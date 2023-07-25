@@ -19,4 +19,6 @@ var (
 	ErrNotAllowed = errors.New("not allowed")
 	// ErrInvalidPacket is the invalid packet error.
 	ErrInvalidPacket = errors.New("invalid packet")
+	// ErrNotFound is the not found error.
+	ErrNotFound = errors.New("not found")
 )

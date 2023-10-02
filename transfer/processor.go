@@ -101,7 +101,11 @@ func (p *Processor) BatchData(op string, presentAction string, missingAction str
 		if item.Present {
 			action = presentAction
 		}
-		oids = append(oids, fmt.Sprintf("%s %d %s", item.Oid, item.Size, action))
+		args := ""
+		for _, arg := range item.Args {
+			args += fmt.Sprintf(" %s=%s", arg.Key, arg.Value)
+		}
+		oids = append(oids, fmt.Sprintf("%s %d %s%s", item.Oid, item.Size, action, args))
 	}
 	return NewSuccessStatus(oids), nil
 }

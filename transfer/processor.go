@@ -107,7 +107,7 @@ func (p *Processor) BatchData(op string, presentAction string, missingAction str
 	}
 	batch, err := p.ReadBatch(op, args)
 	if err != nil {
-		return p.Error(StatusBadRequest, err.Error(), ArgsToList(args)...)
+		return nil, err
 	}
 	oids := make([]string, 0)
 	for _, item := range batch {
@@ -425,19 +425,19 @@ func (p *Processor) ProcessCommands(op string) error {
 			if len(msgs) > 1 {
 				status, err = p.PutObject(msgs[1])
 			} else {
-				err = p.handler.SendError(StatusForbidden, "not allowed")
+				err = p.handler.SendError(StatusBadRequest, "bad request")
 			}
 		case verifyObjectCommand:
 			if len(msgs) > 1 {
 				status, err = p.VerifyObject(msgs[1])
 			} else {
-				err = p.handler.SendError(StatusForbidden, "not allowed")
+				err = p.handler.SendError(StatusBadRequest, "bad request")
 			}
 		case getObjectCommand:
 			if len(msgs) > 1 {
 				status, err = p.GetObject(msgs[1])
 			} else {
-				err = p.handler.SendError(StatusForbidden, "not allowed")
+				err = p.handler.SendError(StatusBadRequest, "bad request")
 			}
 		case lockCommand:
 			status, err = p.Lock()
@@ -466,10 +466,26 @@ func (p *Processor) ProcessCommands(op string) error {
 		if err != nil {
 			switch {
 			case errors.Is(err, ErrExtraData),
-				errors.Is(err, ErrNotAllowed),
+				errors.Is(err, ErrParseError),
 				errors.Is(err, ErrInvalidPacket),
 				errors.Is(err, ErrCorruptData):
 				if err := p.handler.SendError(StatusBadRequest, fmt.Errorf("error: %w", err).Error()); err != nil {
+					p.logger.Log("failed to send pktline", "err", err)
+				}
+			case errors.Is(err, ErrNotAllowed):
+				if err := p.handler.SendError(StatusMethodNotAllowed, fmt.Errorf("error: %w", err).Error()); err != nil {
+					p.logger.Log("failed to send pktline", "err", err)
+				}
+			case errors.Is(err, ErrNotFound):
+				if err := p.handler.SendError(StatusNotFound, fmt.Errorf("error: %w", err).Error()); err != nil {
+					p.logger.Log("failed to send pktline", "err", err)
+				}
+			case errors.Is(err, ErrUnauthorized):
+				if err := p.handler.SendError(StatusUnauthorized, fmt.Errorf("error: %w", err).Error()); err != nil {
+					p.logger.Log("failed to send pktline", "err", err)
+				}
+			case errors.Is(err, ErrForbidden):
+				if err := p.handler.SendError(StatusForbidden, fmt.Errorf("error: %w", err).Error()); err != nil {
 					p.logger.Log("failed to send pktline", "err", err)
 				}
 			default:

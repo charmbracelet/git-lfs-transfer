@@ -16,8 +16,10 @@ const (
 	StatusBadRequest          uint32 = http.StatusBadRequest
 	StatusForbidden           uint32 = http.StatusForbidden
 	StatusNotFound            uint32 = http.StatusNotFound
+	StatusMethodNotAllowed    uint32 = http.StatusMethodNotAllowed
 	StatusConflict            uint32 = http.StatusConflict
 	StatusInternalServerError uint32 = http.StatusInternalServerError
+	StatusUnauthorized        uint32 = http.StatusUnauthorized
 )
 
 // StatusString returns the status string lowercased for a status code.

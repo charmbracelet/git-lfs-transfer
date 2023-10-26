@@ -24,7 +24,7 @@ func ParseArgs(parts []string) (Args, error) {
 	for _, line := range parts {
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
-			continue
+			return nil, fmt.Errorf("invalid argument: %q", line)
 		}
 		key, value := parts[0], parts[1]
 		args[key] = value

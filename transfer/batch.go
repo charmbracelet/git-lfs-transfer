@@ -9,10 +9,4 @@ type BatchItem struct {
 
 	// Args is an optional oid-line key-value pairs.
 	Args Args
-<<<<<<< HEAD
-=======
-
-	// Error is an optional error message.
-	Error string
->>>>>>> 29d6979f6467 (feat: support batch response error message)
 }

@@ -35,20 +35,12 @@ func (p *Processor) Version() (Status, error) {
 }
 
 // Error returns a transfer protocol error.
-func (p *Processor) Error(code uint32, message string) (Status, error) {
-	return NewFailureStatus(code, message), nil
+func (p *Processor) Error(code uint32, message string, args ...string) (Status, error) {
+	return NewFailureStatusWithArgs(code, message, args...), nil
 }
 
 // ReadBatch reads a batch request.
-func (p *Processor) ReadBatch(op string) ([]BatchItem, error) {
-	ar, err := p.handler.ReadPacketListToDelim()
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
-	}
-	args, err := ParseArgs(ar)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
-	}
+func (p *Processor) ReadBatch(op string, args Args) ([]BatchItem, error) {
 	data, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
@@ -101,9 +93,17 @@ func (p *Processor) ReadBatch(op string) ([]BatchItem, error) {
 
 // BatchData writes batch data to the transfer protocol.
 func (p *Processor) BatchData(op string, presentAction string, missingAction string) (Status, error) {
-	batch, err := p.ReadBatch(op)
+	ar, err := p.handler.ReadPacketListToDelim()
 	if err != nil {
-		return p.Error(StatusBadRequest, err.Error())
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	args, err := ParseArgs(ar)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	batch, err := p.ReadBatch(op, args)
+	if err != nil {
+		return p.Error(StatusBadRequest, err.Error(), ArgsToList(args)...)
 	}
 	oids := make([]string, 0)
 	for _, item := range batch {

@@ -43,8 +43,7 @@ func New(lfsPath string, umask os.FileMode, timestamp *time.Time) *LocalBackend 
 }
 
 // Batch implements main.Backend.
-func (l *LocalBackend) Batch(_ string, pointers []transfer.Pointer, _ map[string]string) ([]transfer.BatchItem, error) {
-	items := make([]transfer.BatchItem, 0)
+func (l *LocalBackend) Batch(_ string, pointers []transfer.BatchItem, _ transfer.Args) ([]transfer.BatchItem, error) {
 	for _, o := range pointers {
 		present := false
 		stat, err := os.Stat(oidExpectedPath(l.lfsPath, o.Oid))
@@ -52,17 +51,14 @@ func (l *LocalBackend) Batch(_ string, pointers []transfer.Pointer, _ map[string
 			o.Size = stat.Size()
 			present = true
 		}
-		items = append(items, transfer.BatchItem{
-			Pointer: o,
-			Present: present,
-		})
+		o.Present = present
 	}
-	return items, nil
+	return pointers, nil
 }
 
 // Download implements main.Backend. The returned reader must be closed by the
 // caller.
-func (l *LocalBackend) Download(oid string, _ map[string]string) (fs.File, error) {
+func (l *LocalBackend) Download(oid string, _ transfer.Args) (fs.File, error) {
 	f, err := os.Open(oidExpectedPath(l.lfsPath, oid))
 	if err != nil {
 		return nil, err
@@ -71,7 +67,7 @@ func (l *LocalBackend) Download(oid string, _ map[string]string) (fs.File, error
 }
 
 // FinishUpload implements main.Backend.
-func (l *LocalBackend) FinishUpload(state interface{}, _ map[string]string) error {
+func (l *LocalBackend) FinishUpload(state interface{}, _ transfer.Args) error {
 	switch state := state.(type) {
 	case *UploadState:
 		destPath := oidExpectedPath(l.lfsPath, state.Oid)
@@ -94,7 +90,7 @@ func (l *LocalBackend) FinishUpload(state interface{}, _ map[string]string) erro
 }
 
 // LockBackend implements main.Backend.
-func (l *LocalBackend) LockBackend(_ map[string]string) transfer.LockBackend {
+func (l *LocalBackend) LockBackend(_ transfer.Args) transfer.LockBackend {
 	path := filepath.Join(l.lfsPath, "locks")
 	return NewLockBackend(l, path)
 }
@@ -106,7 +102,7 @@ type UploadState struct {
 }
 
 // StartUpload implements main.Backend. The returned temp file should be closed.
-func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ map[string]string) (interface{}, error) {
+func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ transfer.Args) (interface{}, error) {
 	if r == nil {
 		return nil, fmt.Errorf("%w: received null data", transfer.ErrMissingData)
 	}
@@ -132,7 +128,7 @@ func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ map[string]string)
 }
 
 // Verify implements main.Backend.
-func (l *LocalBackend) Verify(oid string, args map[string]string) (transfer.Status, error) {
+func (l *LocalBackend) Verify(oid string, args transfer.Args) (transfer.Status, error) {
 	var expectedSize int
 	size, ok := args[transfer.SizeKey]
 	if ok {

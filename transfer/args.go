@@ -19,12 +19,12 @@ const (
 )
 
 // ParseArgs parses the given args.
-func ParseArgs(lines []string) (map[string]string, error) {
-	args := make(map[string]string, 0)
-	for _, line := range lines {
+func ParseArgs(parts []string) (Args, error) {
+	args := make(Args, 0)
+	for _, line := range parts {
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid argument: %q", line)
+			continue
 		}
 		key, value := parts[0], parts[1]
 		args[key] = value
@@ -34,10 +34,18 @@ func ParseArgs(lines []string) (map[string]string, error) {
 }
 
 // ArgsToList converts the given args to a list.
-func ArgsToList(args map[string]string) []string {
+func ArgsToList(args Args) []string {
 	list := make([]string, 0)
 	for key, value := range args {
 		list = append(list, fmt.Sprintf("%s=%s", key, value))
 	}
 	return list
+}
+
+// Args is a key-value pair of arguments.
+type Args map[string]string
+
+// String returns the string representation of the arguments.
+func (a Args) String() string {
+	return strings.Join(ArgsToList(a), " ")
 }

@@ -166,7 +166,7 @@ func (l *localLockBackend) Timestamp() *time.Time {
 }
 
 // Create implements main.LockBackend.
-func (l *localLockBackend) Create(path, refname string) (transfer.Lock, error) {
+func (l *localLockBackend) Create(path, _ string) (transfer.Lock, error) {
 	id := localBackendLock{}.HashFor(path)
 	var b bytes.Buffer
 	b.WriteString(fmt.Sprintf("%s:%d:", LocalBackendLockVersion, l.Timestamp().Unix()))

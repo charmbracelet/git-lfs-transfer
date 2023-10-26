@@ -44,6 +44,7 @@ func NewPktline(r io.Reader, w io.Writer, logger Logger) *Pktline {
 		Pktline: pktline.NewPktline(r, w),
 		r:       r,
 		w:       w,
+		logger:  logger,
 	}
 }
 

@@ -34,7 +34,7 @@ func (p Pointer) IsValid() bool {
 	return true
 }
 
-// RelativePath returns the relative storage path of the pointer
+// RelativePath returns the relative storage path of the pointer.
 func (p Pointer) RelativePath() string {
 	if len(p.Oid) < 5 {
 		return p.Oid

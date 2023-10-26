@@ -11,7 +11,7 @@ type noopLogger struct{}
 var _ Logger = (*noopLogger)(nil)
 
 // Log implements Logger.
-func (*noopLogger) Log(v ...interface{}) {}
+func (*noopLogger) Log(...interface{}) {}
 
 // Logf implements Logger.
-func (*noopLogger) Logf(format string, v ...interface{}) {}
+func (*noopLogger) Logf(string, ...interface{}) {}

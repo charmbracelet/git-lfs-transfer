@@ -43,7 +43,7 @@ func New(lfsPath string, umask os.FileMode, timestamp *time.Time) *LocalBackend 
 }
 
 // Batch implements main.Backend.
-func (l *LocalBackend) Batch(_ string, pointers []transfer.Pointer) ([]transfer.BatchItem, error) {
+func (l *LocalBackend) Batch(_ string, pointers []transfer.Pointer, _ map[string]string) ([]transfer.BatchItem, error) {
 	items := make([]transfer.BatchItem, 0)
 	for _, o := range pointers {
 		present := false
@@ -62,7 +62,7 @@ func (l *LocalBackend) Batch(_ string, pointers []transfer.Pointer) ([]transfer.
 
 // Download implements main.Backend. The returned reader must be closed by the
 // caller.
-func (l *LocalBackend) Download(oid string, _ ...string) (fs.File, error) {
+func (l *LocalBackend) Download(oid string, _ map[string]string) (fs.File, error) {
 	f, err := os.Open(oidExpectedPath(l.lfsPath, oid))
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (l *LocalBackend) Download(oid string, _ ...string) (fs.File, error) {
 }
 
 // FinishUpload implements main.Backend.
-func (l *LocalBackend) FinishUpload(state interface{}, _ ...string) error {
+func (l *LocalBackend) FinishUpload(state interface{}, _ map[string]string) error {
 	switch state := state.(type) {
 	case *UploadState:
 		destPath := oidExpectedPath(l.lfsPath, state.Oid)
@@ -94,7 +94,7 @@ func (l *LocalBackend) FinishUpload(state interface{}, _ ...string) error {
 }
 
 // LockBackend implements main.Backend.
-func (l *LocalBackend) LockBackend() transfer.LockBackend {
+func (l *LocalBackend) LockBackend(_ map[string]string) transfer.LockBackend {
 	path := filepath.Join(l.lfsPath, "locks")
 	return NewLockBackend(l, path)
 }
@@ -106,7 +106,7 @@ type UploadState struct {
 }
 
 // StartUpload implements main.Backend. The returned temp file should be closed.
-func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ ...string) (interface{}, error) {
+func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ map[string]string) (interface{}, error) {
 	if r == nil {
 		return nil, fmt.Errorf("%w: received null data", transfer.ErrMissingData)
 	}
@@ -173,7 +173,7 @@ func (l *localLockBackend) Timestamp() *time.Time {
 }
 
 // Create implements main.LockBackend.
-func (l *localLockBackend) Create(path string) (transfer.Lock, error) {
+func (l *localLockBackend) Create(path, refname string) (transfer.Lock, error) {
 	id := localBackendLock{}.HashFor(path)
 	var b bytes.Buffer
 	b.WriteString(fmt.Sprintf("%s:%d:", LocalBackendLockVersion, l.Timestamp().Unix()))
@@ -240,11 +240,11 @@ func (localLockBackend) Unlock(lock transfer.Lock) error {
 }
 
 // Range implements main.LockBackend. Iterate over all locks. Returning an error will break and return.
-func (l *localLockBackend) Range(f func(l transfer.Lock) error) error {
+func (l *localLockBackend) Range(_ string, _ int, f func(l transfer.Lock) error) (string, error) {
 	var err error
 	data, err := os.ReadDir(l.lockPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	transfer.Logf("found %d locks", len(data))
 	sort.Slice(data, func(i, j int) bool {
@@ -258,8 +258,8 @@ func (l *localLockBackend) Range(f func(l transfer.Lock) error) error {
 			err = errors.Join(err, fmt.Errorf("error reading lock %s: %w", lf.Name(), err))
 		}
 		if err := f(lock); err != nil {
-			return err
+			return "", err
 		}
 	}
-	return err
+	return "", err
 }

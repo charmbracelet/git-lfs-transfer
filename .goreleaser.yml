@@ -1,89 +1,14 @@
----
+includes:
+  - from_url:
+      url: charmbracelet/meta/main/goreleaser-simple.yaml
 
-builds:
-  - binary: 'git-lfs-transfer'
-    env:
-      - CGO_ENABLED=0
-    main: '.'
-    ldflags: -s -w -X main.Version=v{{ .Version }} -X main.CommitSHA={{ .Commit }} -X main.CommitDate={{ .CommitDate }}
-    goos:
-      - linux
-      - darwin
-      - windows
-      - freebsd
-      - openbsd
-      - netbsd
-    goarch:
-      - amd64
-      - arm64
-      - "386"
-      - arm
-    goarm:
-      - "7"
-    ignore:
-      - goos: windows
-        goarch: arm64
-      - goos: windows
-        goarm: "7"
-
-archives:
-  - format_overrides:
-      - goos: windows
-        format: zip
-    replacements:
-      windows: Windows
-      darwin: Darwin
-      linux: Linux
-      386: i386
-      amd64: x86_64
-    files:
-      - README*
-      - LICENSE*
-
-nightly:
-  name_template: "{{ .ShortCommit }}-devel"
-  publish_release: true
-  keep_single_release: true
-  tag_name: nightly
-
-checksum:
-  name_template: 'checksums.txt'
-
-source:
-  enabled: true
-
-changelog:
-  sort: asc
-  use: github
-  filters:
-    exclude:
-    - '^test:'
-    - '^chore'
-    - 'merge conflict'
-    - Merge pull request
-    - Merge remote-tracking branch
-    - Merge branch
-    - go mod tidy
-  groups:
-    - title: Dependency updates
-      regexp: "^.*feat\\(deps\\)*:+.*$"
-      order: 300
-    - title: 'New Features'
-      regexp: "^.*feat[(\\w)]*:+.*$"
-      order: 100
-    - title: 'Bug fixes'
-      regexp: "^.*fix[(\\w)]*:+.*$"
-      order: 200
-    - title: 'Documentation updates'
-      regexp: "^.*docs[(\\w)]*:+.*$"
-      order: 400
-    - title: Other work
-      order: 9999
-
-release:
-  footer: |
-    * * *
-    <a href="https://charm.sh/"><img alt="The Charm logo" src="https://stuff.charm.sh/charm-badge.jpg" width="400"></a>
-    Thoughts? Questions? We love hearing from you. Feel free to reach out on [Twitter](https://twitter.com/charmcli), [The Fediverse](https://mastodon.technology/@charm), or on [Discord](https://charm.sh/chat).
+variables:
+  main: "./cmd"
+  binary_name: git-lfs-transfer
+  description: "Server-side implementation of the Git LFS pure-SSH protocol"
+  github_url: "https://github.com/charmbracelet/git-lfs-transfer"
+  maintainer: "Ayman Bagabas <ayman@charm.sh>"
+  brew_commit_author_name: "Ayman Bagabas"
+  brew_commit_author_email: "ayman@charm.sh"
 
 # yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json

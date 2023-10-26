@@ -3,7 +3,7 @@ module github.com/charmbracelet/git-lfs-transfer
 go 1.20
 
 require (
-	github.com/git-lfs/git-lfs/v3 v3.3.0
+	github.com/git-lfs/git-lfs/v3 v3.4.0
 	github.com/git-lfs/pktline v0.0.0-20230103162542-ca444d533ef1
 	github.com/rubyist/tracerx v0.0.0-20170927163412-787959303086
 	golang.org/x/sys v0.10.0

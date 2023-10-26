@@ -34,7 +34,7 @@ func NewProcessor(line *Pktline, backend Backend, logger Logger) *Processor {
 func (p *Processor) Version() (Status, error) {
 	_, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
-		p.logger.Logf("version error: %s", err)
+		p.logger.Log("invalid version", "err", err)
 	}
 	return NewSuccessStatus([]string{}), nil
 }
@@ -56,8 +56,7 @@ func (p *Processor) ReadBatch(op string, args Args) ([]BatchItem, error) {
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrNotAllowed, fmt.Sprintf("unsupported hash algorithm: %s", hashAlgo))
 	}
-	p.logger.Logf("data: %d %v", len(data), data)
-	p.logger.Logf("batch: %s args: %d %v data: %d %v", op, len(args), args, len(data), data)
+	p.logger.Log("read batch", "operation", op, "args-len", len(args), "args", args, "data-len", len(data), "data", data)
 	items := make([]BatchItem, 0)
 	for _, line := range data {
 		if line == "" {
@@ -87,12 +86,12 @@ func (p *Processor) ReadBatch(op string, args Args) ([]BatchItem, error) {
 		}
 		items = append(items, item)
 	}
-	p.logger.Logf("items %v", items)
+	p.logger.Log("batch items", "items", items)
 	its, err := p.backend.Batch(op, items, args)
 	if err != nil {
 		return nil, err
 	}
-	p.logger.Logf("batch items: %v", its)
+	p.logger.Log("batch items", "items", items)
 	return its, nil
 }
 
@@ -244,12 +243,12 @@ func (p *Processor) Lock() (Status, error) {
 	for {
 		lock, err := lockBackend.Create(path, refname)
 		if errors.Is(err, ErrConflict) {
-			p.logger.Logf("lock conflict")
+			p.logger.Log("lock conflict")
 			lock, err = lockBackend.FromPath(path)
 			if err != nil {
-				p.logger.Logf("lock conflict, but no lock found")
+				p.logger.Log("lock conflict, but no lock found")
 				if retried {
-					p.logger.Logf("lock conflict, but no lock found, and retried")
+					p.logger.Log("lock conflict, but no lock found, and retried")
 					return nil, err
 				}
 				retried = true
@@ -258,10 +257,10 @@ func (p *Processor) Lock() (Status, error) {
 			return NewFailureStatusWithArgs(StatusConflict, "conflict", lock.AsArguments()...), nil
 		}
 		if err != nil {
-			p.logger.Logf("lock error: %v", err)
+			p.logger.Log("failed to create lock", "err", err)
 			return nil, err
 		}
-		p.logger.Logf("lock success: %v", lock)
+		p.logger.Log("lock success", "lock", lock)
 		return NewSuccessStatusWithCode(StatusCreated, lock.AsArguments()...), nil
 	}
 	// unreachable
@@ -320,7 +319,7 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 			// skip nil locks
 			return nil
 		}
-		p.logger.Logf("adding lock %s %s", lock.Path(), lock.ID())
+		p.logger.Log("adding lock", "path", lock.Path(), "id", lock.ID())
 		locks = append(locks, lock)
 		return nil
 	})
@@ -388,21 +387,21 @@ func (p *Processor) ProcessCommands(op string) error {
 		if err != nil {
 			return err
 		}
-		p.logger.Logf("received packet: %s", pkt)
+		p.logger.Log("received packet", "packet", pkt)
 		if pkt == "" {
 			if err := p.handler.SendError(StatusBadRequest, "unknown command"); err != nil {
-				p.logger.Logf("error pktline sending error: %v", err)
+				p.logger.Log("failed to send pktline", "err", err)
 			}
 			continue
 		}
 		msgs := strings.Split(pkt, " ")
 		if len(msgs) < 1 {
 			if err := p.handler.SendError(StatusBadRequest, "no command provided"); err != nil {
-				p.logger.Logf("error pktline sending error: %v", err)
+				p.logger.Log("failed to send pktline", "err", err)
 			}
 			continue
 		}
-		p.logger.Logf("received command: %s %v", msgs[0], msgs[1:])
+		p.logger.Log("received command", "command", msgs[0], "messages", msgs[1:])
 		var status Status
 		switch msgs[0] {
 		case versionCommand:
@@ -414,10 +413,10 @@ func (p *Processor) ProcessCommands(op string) error {
 		case batchCommand:
 			switch op {
 			case UploadOperation:
-				p.logger.Logf("upload batch command received")
+				p.logger.Log("upload batch command received")
 				status, err = p.UploadBatch()
 			case DownloadOperation:
-				p.logger.Logf("download batch command received")
+				p.logger.Log("download batch command received")
 				status, err = p.DownloadBatch()
 			default:
 				err = p.handler.SendError(StatusBadRequest, "unknown operation")
@@ -449,7 +448,7 @@ func (p *Processor) ProcessCommands(op string) error {
 			case DownloadOperation:
 				status, err = p.ListLocks(false)
 			}
-			p.logger.Logf("list lock status: %v %v", status, err)
+			p.logger.Log("list lock command", "status", status, "err", err)
 		case unlockCommand:
 			if len(msgs) > 1 {
 				status, err = p.Unlock(msgs[1])
@@ -458,7 +457,7 @@ func (p *Processor) ProcessCommands(op string) error {
 			}
 		case quitCommand:
 			if err := p.handler.SendStatus(SuccessStatus()); err != nil {
-				p.logger.Logf("error pktline sending status: %v", err)
+				p.logger.Log("failed to send pktline", "err", err)
 			}
 			return nil
 		default:
@@ -471,18 +470,18 @@ func (p *Processor) ProcessCommands(op string) error {
 				errors.Is(err, ErrInvalidPacket),
 				errors.Is(err, ErrCorruptData):
 				if err := p.handler.SendError(StatusBadRequest, fmt.Errorf("error: %w", err).Error()); err != nil {
-					p.logger.Logf("error pktline sending error: %v", err)
+					p.logger.Log("failed to send pktline", "err", err)
 				}
 			default:
-				p.logger.Logf("error processing command: %v", err)
+				p.logger.Log("failed to process command", "err", err)
 				if err := p.handler.SendError(StatusInternalServerError, "internal error"); err != nil {
-					p.logger.Logf("error pktline sending error: %v", err)
+					p.logger.Log("failed to send pktline", "err", err)
 				}
 			}
 		}
 		if status != nil {
 			if err := p.handler.SendStatus(status); err != nil {
-				p.logger.Logf("error pktline sending status: %v", err)
+				p.logger.Log("failed to send pktline", "err", err)
 			}
 		}
 		p.logger.Log("processed command")

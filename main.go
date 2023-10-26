@@ -12,13 +12,12 @@ import (
 type tracerxLogger struct{}
 
 // Log logs the given arguments if Debug is true.
-func (*tracerxLogger) Log(v ...interface{}) {
-	tracerx.Printf("%v", v...)
-}
-
-// Logf logs the given arguments if Debug is true.
-func (*tracerxLogger) Logf(format string, v ...interface{}) {
-	tracerx.Printf(format, v...)
+func (*tracerxLogger) Log(msg string, kv ...interface{}) {
+	format := msg
+	for i := 0; i < len(kv); i += 2 {
+		format += " %s=%v"
+	}
+	tracerx.Printf(format, kv...)
 }
 
 var logger = new(tracerxLogger)

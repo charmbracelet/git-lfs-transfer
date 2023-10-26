@@ -31,7 +31,7 @@ func ensureDirs(path string) error {
 	return nil
 }
 
-func run(r io.Reader, w io.Writer, args []string) error {
+func run(r io.Reader, w io.Writer, args ...string) error {
 	if len(args) != 2 {
 		return fmt.Errorf("expected 2 arguments, got %d", len(args))
 	}
@@ -53,14 +53,14 @@ func run(r io.Reader, w io.Writer, args []string) error {
 	handler := transfer.NewPktline(r, w, logger)
 	for _, cap := range capabilities {
 		if err := handler.WritePacketText(cap); err != nil {
-			logger.Logf("error sending capability: %s: %v", cap, err)
+			logger.Log("error sending capability", "cap", cap, "err", err)
 		}
 	}
 	if err := handler.WriteFlush(); err != nil {
-		logger.Logf("error flushing capabilities: %v", err)
+		logger.Log("error flushing capabilities", "err", err)
 	}
 	now := time.Now()
-	logger.Logf("umask %o", umask)
+	logger.Log("umask", "umask", umask)
 	backend := local.New(lfsPath, umask, &now)
 	p := transfer.NewProcessor(handler, backend, logger)
 	defer logger.Log("done processing commands")
@@ -94,15 +94,15 @@ func Command(stdin io.Reader, stdout io.Writer, stderr io.Writer, args ...string
 	errc := make(chan error, 1)
 
 	setup(done)
-	logger.Logf("git-lfs-transfer %s", "v1")
+	logger.Log("git-lfs-transfer", "version", "v1")
 	defer logger.Log("git-lfs-transfer completed")
 	go func() {
-		errc <- run(stdin, stdout, args)
+		errc <- run(stdin, stdout, args...)
 	}()
 
 	select {
 	case s := <-done:
-		logger.Logf("signal %q received", s)
+		logger.Log("signal received", "signal", s)
 	case err := <-errc:
 		logger.Log("done running")
 		fmt.Fprintln(stderr, Usage())

@@ -29,7 +29,6 @@ func ParseArgs(parts []string) (Args, error) {
 		key, value := parts[0], parts[1]
 		args[key] = value
 	}
-	Logf("args: %d %v", len(args), args)
 	return args, nil
 }
 

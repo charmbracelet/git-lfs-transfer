@@ -72,7 +72,6 @@ func (l *LocalBackend) FinishUpload(state interface{}, _ transfer.Args) error {
 	case *UploadState:
 		destPath := oidExpectedPath(l.lfsPath, state.Oid)
 		parent := filepath.Dir(destPath)
-		transfer.Logf("finishing upload of %s at %s", destPath, parent)
 		if err := os.MkdirAll(parent, 0777); err != nil {
 			return err
 		}
@@ -106,7 +105,6 @@ func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ transfer.Args) (in
 	if r == nil {
 		return nil, fmt.Errorf("%w: received null data", transfer.ErrMissingData)
 	}
-	transfer.Logf("start uploading %s", oid)
 	tempDir := filepath.Join(l.lfsPath, "incomplete")
 	randBytes := make([]byte, 12)
 	if _, err := rand.Read(randBytes); err != nil {
@@ -142,7 +140,6 @@ func (l *LocalBackend) Verify(oid string, args transfer.Args) (transfer.Status, 
 		return nil, err
 	}
 	if stat.Size() != int64(expectedSize) {
-		transfer.Logf("size mismatch, expected %d, got %d", expectedSize, stat.Size())
 		return transfer.NewFailureStatus(transfer.StatusConflict, "size mismatch"), nil
 	}
 	return transfer.SuccessStatus(), nil
@@ -242,12 +239,10 @@ func (l *localLockBackend) Range(_ string, _ int, f func(l transfer.Lock) error)
 	if err != nil {
 		return "", err
 	}
-	transfer.Logf("found %d locks", len(data))
 	sort.Slice(data, func(i, j int) bool {
 		return data[i].Name() < data[j].Name()
 	})
 	for _, lf := range data {
-		transfer.Logf("found lock %s", lf.Name())
 		var lock transfer.Lock
 		lock, err = l.FromID(lf.Name())
 		if err != nil {

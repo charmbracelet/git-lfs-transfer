@@ -1,20 +1,17 @@
 package transfer
 
-import (
-	"github.com/rubyist/tracerx"
-)
-
-var (
-	// Debug is the debug flag.
-	Debug = false
-)
-
-// Log logs the given arguments if Debug is true.
-func Log(v ...interface{}) {
-	tracerx.Printf("%v", v...)
+// Logger is a logging interface.
+type Logger interface {
+	Log(v ...interface{})
+	Logf(format string, v ...interface{})
 }
 
-// Logf logs the given arguments if Debug is true.
-func Logf(format string, v ...interface{}) {
-	tracerx.Printf(format, v...)
-}
+type noopLogger struct{}
+
+var _ Logger = (*noopLogger)(nil)
+
+// Log implements Logger.
+func (*noopLogger) Log(v ...interface{}) {}
+
+// Logf implements Logger.
+func (*noopLogger) Logf(format string, v ...interface{}) {}

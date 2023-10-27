@@ -13,13 +13,6 @@ import (
 	"github.com/rubyist/tracerx"
 )
 
-var (
-	capabilities = []string{
-		"version=1",
-		"locking",
-	}
-)
-
 func ensureDirs(path string) error {
 	for _, dir := range []string{
 		"objects", "incomplete", "tmp", "locks",
@@ -51,7 +44,7 @@ func run(r io.Reader, w io.Writer, args ...string) error {
 	}
 	umask := setPermissions(gitdir)
 	handler := transfer.NewPktline(r, w, logger)
-	for _, cap := range capabilities {
+	for _, cap := range transfer.Capabilities {
 		if err := handler.WritePacketText(cap); err != nil {
 			logger.Log("error sending capability", "cap", cap, "err", err)
 		}

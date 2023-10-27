@@ -34,14 +34,14 @@ func NewProcessor(line *Pktline, backend Backend, logger Logger) *Processor {
 func (p *Processor) Version() (Status, error) {
 	_, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
-		p.logger.Log("invalid version", "err", err)
+		return nil, err
 	}
-	return NewSuccessStatus([]string{}), nil
+	return NewSuccessStatusWithArgs([]string{}), nil
 }
 
 // Error returns a transfer protocol error.
 func (p *Processor) Error(code uint32, message string, args ...string) (Status, error) {
-	return NewFailureStatusWithArgs(code, message, args...), nil
+	return NewStatusWithArgs(code, []string{message}, args...), nil
 }
 
 // ReadBatch reads a batch request.
@@ -121,7 +121,7 @@ func (p *Processor) BatchData(op string, presentAction string, missingAction str
 		}
 		oids = append(oids, line)
 	}
-	return NewSuccessStatus(oids), nil
+	return NewSuccessStatus(oids...), nil
 }
 
 // UploadBatch writes upload data to the transfer protocol.
@@ -211,7 +211,7 @@ func (p *Processor) GetObject(oid string) (Status, error) {
 	}
 	r, err := p.backend.Download(oid, args)
 	if errors.Is(err, fs.ErrNotExist) {
-		return NewFailureStatus(StatusNotFound, fmt.Sprintf("object %s not found", oid)), nil
+		return NewStatus(StatusNotFound, fmt.Sprintf("object %s not found", oid)), nil
 	}
 	if err != nil {
 		return nil, err
@@ -256,14 +256,14 @@ func (p *Processor) Lock() (Status, error) {
 					continue
 				}
 			}
-			return NewFailureStatusWithArgs(StatusConflict, "conflict", lock.AsArguments()...), nil
+			return NewStatusWithArgs(StatusConflict, []string{"conflict"}, lock.AsArguments()...), nil
 		}
 		if err != nil {
 			p.logger.Log("failed to create lock", "err", err)
 			return nil, err
 		}
 		p.logger.Log("lock success", "lock", lock)
-		return NewSuccessStatusWithCode(StatusCreated, lock.AsArguments()...), nil
+		return NewStatusWithArgs(StatusCreated, nil, lock.AsArguments()...), nil
 	}
 	// unreachable
 }
@@ -282,7 +282,7 @@ func (p *Processor) ListLocksForPath(path string, cursor string, useOwnerID bool
 	if err != nil {
 		return nil, err
 	}
-	return NewSuccessStatus(spec), nil
+	return NewSuccessStatus(spec...), nil
 }
 
 // ListLocks lists locks.
@@ -345,7 +345,7 @@ func (p *Processor) ListLocks(useOwnerID bool) (Status, error) {
 		dataArgs = append(dataArgs, fmt.Sprintf("next-cursor=%s", nextCursor))
 	}
 
-	return NewSuccessStatusWithData(StatusAccepted, msgs, dataArgs...), nil
+	return NewSuccessStatusWithArgs(msgs, dataArgs...), nil
 }
 
 // Unlock unlocks a lock.
@@ -375,7 +375,7 @@ func (p *Processor) Unlock(id string) (Status, error) {
 			return nil, err
 		}
 	}
-	return NewSuccessStatusWithCode(StatusOK, lock.AsArguments()...), nil
+	return NewSuccessStatusWithArgs(nil, lock.AsArguments()...), nil
 }
 
 // ProcessCommands processes commands from the transfer protocol.
@@ -407,7 +407,7 @@ func (p *Processor) ProcessCommands(op string) error {
 		var status Status
 		switch msgs[0] {
 		case versionCommand:
-			if len(msgs) > 0 && msgs[1] == "1" {
+			if len(msgs) > 0 && msgs[1] == Version {
 				status, err = p.Version()
 			} else {
 				err = p.handler.SendError(StatusBadRequest, "unknown version")

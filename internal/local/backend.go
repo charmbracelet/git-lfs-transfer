@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/git-lfs-transfer/transfer"
+	"github.com/rubyist/tracerx"
 )
 
 var _ transfer.Backend = &LocalBackend{}
@@ -44,14 +45,14 @@ func New(lfsPath string, umask os.FileMode, timestamp *time.Time) *LocalBackend 
 
 // Batch implements main.Backend.
 func (l *LocalBackend) Batch(_ string, pointers []transfer.BatchItem, _ transfer.Args) ([]transfer.BatchItem, error) {
-	for _, o := range pointers {
+	for i := range pointers {
 		present := false
-		stat, err := os.Stat(oidExpectedPath(l.lfsPath, o.Oid))
+		stat, err := os.Stat(oidExpectedPath(l.lfsPath, pointers[i].Oid))
 		if err == nil {
-			o.Size = stat.Size()
+			pointers[i].Size = stat.Size()
 			present = true
 		}
-		o.Present = present
+		pointers[i].Present = present
 	}
 	return pointers, nil
 }
@@ -117,6 +118,7 @@ func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ transfer.Args) (in
 		return nil, err
 	}
 	if _, err := io.Copy(f, r); err != nil {
+		tracerx.Printf("Error copying data to temp file: %v", err)
 		return nil, err
 	}
 	return &UploadState{
@@ -136,11 +138,14 @@ func (l *LocalBackend) Verify(oid string, args transfer.Args) (transfer.Status, 
 		return nil, fmt.Errorf("missing size argument")
 	}
 	stat, err := os.Stat(oidExpectedPath(l.lfsPath, oid))
+	if errors.Is(err, fs.ErrNotExist) {
+		return transfer.NewStatus(transfer.StatusNotFound, "not found"), nil
+	}
 	if err != nil {
 		return nil, err
 	}
 	if stat.Size() != int64(expectedSize) {
-		return transfer.NewFailureStatus(transfer.StatusConflict, "size mismatch"), nil
+		return transfer.NewStatus(transfer.StatusConflict, "size mismatch"), nil
 	}
 	return transfer.SuccessStatus(), nil
 }

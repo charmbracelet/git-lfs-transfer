@@ -16,11 +16,11 @@ go install github.com/charmbracelet/git-lfs-transfer@latest
 
 ```bash
 # Usage
-git-lfs-transfer <Path> <Operation>
+git-lfs-transfer <Directory> <Operation>
 
 # Example
-git-lfs-transfer large-file.mp4 upload
-git-lfs-transfer large-file.mp4 download
+git-lfs-transfer repo.git upload
+git-lfs-transfer repo.git download
 ```
 
 ## Acknowledgements

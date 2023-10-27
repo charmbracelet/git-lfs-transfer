@@ -21,4 +21,8 @@ var (
 	ErrInvalidPacket = errors.New("invalid packet")
 	// ErrNotFound is the not found error.
 	ErrNotFound = errors.New("not found")
+	// ErrUnauthorized is the unauthorized error.
+	ErrUnauthorized = errors.New("unauthorized")
+	// ErrUnauthorized is the forbidden error.
+	ErrForbidden = errors.New("forbidden")
 )

@@ -76,29 +76,29 @@ func (s *status) Reader() io.Reader {
 
 // SuccessStatus returns a successful status.
 func SuccessStatus() Status {
-	return &status{
-		code: StatusOK,
-	}
+	return NewSuccessStatus()
 }
 
 // NewSuccessStatus returns a new successful status.
-func NewSuccessStatus(messages []string) Status {
+func NewSuccessStatus(messages ...string) Status {
+	return NewSuccessStatusWithArgs(messages)
+}
+
+// NewSuccessStatusWithArgs returns a new successful status with data.
+func NewSuccessStatusWithArgs(messages []string, args ...string) Status {
+	return NewStatusWithArgs(StatusOK, messages, args...)
+}
+
+// NewStatus returns a new status with messages.
+func NewStatus(code uint32, messages ...string) Status {
 	return &status{
-		code:     StatusOK,
+		code:     code,
 		messages: messages,
 	}
 }
 
-// NewSuccessStatusWithCode returns a new successful status with a code.
-func NewSuccessStatusWithCode(code uint32, args ...string) Status {
-	return &status{
-		code: code,
-		args: args,
-	}
-}
-
-// NewSuccessStatusWithData returns a new successful status with data.
-func NewSuccessStatusWithData(code uint32, messages []string, args ...string) Status {
+// NewStatusWithArgs returns a new successful status with data.
+func NewStatusWithArgs(code uint32, messages []string, args ...string) Status {
 	return &status{
 		code:     code,
 		args:     args,
@@ -112,22 +112,5 @@ func NewSuccessStatusWithReader(reader io.Reader, args ...string) Status {
 		code:   StatusOK,
 		args:   args,
 		reader: reader,
-	}
-}
-
-// NewFailureStatus returns a new failure status.
-func NewFailureStatus(code uint32, message string) Status {
-	return &status{
-		code:     code,
-		messages: []string{message},
-	}
-}
-
-// NewFailureStatusWithArgs returns a new failure status with args.
-func NewFailureStatusWithArgs(code uint32, message string, args ...string) Status {
-	return &status{
-		code:     code,
-		args:     args,
-		messages: []string{message},
 	}
 }

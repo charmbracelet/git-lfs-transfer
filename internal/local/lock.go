@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -60,7 +61,11 @@ func (l *LockFile) Close() error {
 
 // Persist persists the lock file.
 func (l *LockFile) Persist() error {
-	if err := os.Link(l.temp, l.path); err != nil {
+	err := os.Link(l.temp, l.path)
+	if errors.Is(err, os.ErrExist) {
+		return transfer.ErrConflict
+	}
+	if err != nil {
 		return fmt.Errorf("error persisting lock file: %w", err)
 	}
 	return nil

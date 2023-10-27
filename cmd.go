@@ -13,13 +13,6 @@ import (
 	"github.com/rubyist/tracerx"
 )
 
-var (
-	capabilities = []string{
-		"version=1",
-		"locking",
-	}
-)
-
 func ensureDirs(path string) error {
 	for _, dir := range []string{
 		"objects", "incomplete", "tmp", "locks",
@@ -31,7 +24,8 @@ func ensureDirs(path string) error {
 	return nil
 }
 
-func run(r io.Reader, w io.Writer, args ...string) error {
+// Run runs the git-lfs-transfer command against the given I/O and arguments.
+func Run(r io.Reader, w io.Writer, args ...string) error {
 	if len(args) != 2 {
 		return fmt.Errorf("expected 2 arguments, got %d", len(args))
 	}
@@ -51,7 +45,7 @@ func run(r io.Reader, w io.Writer, args ...string) error {
 	}
 	umask := setPermissions(gitdir)
 	handler := transfer.NewPktline(r, w, logger)
-	for _, cap := range capabilities {
+	for _, cap := range transfer.Capabilities {
 		if err := handler.WritePacketText(cap); err != nil {
 			logger.Log("error sending capability", "cap", cap, "err", err)
 		}
@@ -97,7 +91,7 @@ func Command(stdin io.Reader, stdout io.Writer, stderr io.Writer, args ...string
 	logger.Log("git-lfs-transfer", "version", "v1")
 	defer logger.Log("git-lfs-transfer completed")
 	go func() {
-		errc <- run(stdin, stdout, args...)
+		errc <- Run(stdin, stdout, args...)
 	}()
 
 	select {

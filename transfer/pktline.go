@@ -57,8 +57,10 @@ func (p *Pktline) SendError(status uint32, message string) error {
 	if err := p.WriteDelim(); err != nil {
 		p.logger.Log("failed to write delimiter", "err", err)
 	}
-	if err := p.WritePacketText(message); err != nil {
-		p.logger.Log("failed to write message", "err", err)
+	if message != "" {
+		if err := p.WritePacketText(message); err != nil {
+			p.logger.Log("failed to write message", "err", err)
+		}
 	}
 	return p.WriteFlush()
 }
@@ -76,7 +78,7 @@ func (p *Pktline) SendStatus(status Status) error {
 			}
 		}
 	}
-	if msgs := status.Messages(); len(msgs) > 0 {
+	if msgs := status.Messages(); msgs != nil {
 		if err := p.WriteDelim(); err != nil {
 			p.logger.Log("failed to write delimiter", "err", err)
 		}

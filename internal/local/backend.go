@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/git-lfs-transfer/transfer"
+	"github.com/rubyist/tracerx"
 )
 
 var _ transfer.Backend = &LocalBackend{}
@@ -44,14 +45,14 @@ func New(lfsPath string, umask os.FileMode, timestamp *time.Time) *LocalBackend 
 
 // Batch implements main.Backend.
 func (l *LocalBackend) Batch(_ string, pointers []transfer.BatchItem, _ transfer.Args) ([]transfer.BatchItem, error) {
-	for _, o := range pointers {
+	for i := range pointers {
 		present := false
-		stat, err := os.Stat(oidExpectedPath(l.lfsPath, o.Oid))
+		stat, err := os.Stat(oidExpectedPath(l.lfsPath, pointers[i].Oid))
 		if err == nil {
-			o.Size = stat.Size()
+			pointers[i].Size = stat.Size()
 			present = true
 		}
-		o.Present = present
+		pointers[i].Present = present
 	}
 	return pointers, nil
 }
@@ -67,7 +68,7 @@ func (l *LocalBackend) Download(oid string, _ transfer.Args) (fs.File, error) {
 }
 
 // FinishUpload implements main.Backend.
-func (l *LocalBackend) FinishUpload(state interface{}, _ transfer.Args) error {
+func (l *LocalBackend) FinishUpload(state io.Closer, _ transfer.Args) error {
 	switch state := state.(type) {
 	case *UploadState:
 		destPath := oidExpectedPath(l.lfsPath, state.Oid)
@@ -78,7 +79,6 @@ func (l *LocalBackend) FinishUpload(state interface{}, _ transfer.Args) error {
 		if err := os.Link(state.TempFile.Name(), destPath); err != nil {
 			return err
 		}
-		defer state.TempFile.Close() // nolint: errcheck
 		if _, err := l.FixPermissions(destPath); err != nil {
 			return err
 		}
@@ -100,8 +100,12 @@ type UploadState struct {
 	TempFile *os.File
 }
 
+func (u *UploadState) Close() error {
+	return u.TempFile.Close()
+}
+
 // StartUpload implements main.Backend. The returned temp file should be closed.
-func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ transfer.Args) (interface{}, error) {
+func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ transfer.Args) (io.Closer, error) {
 	if r == nil {
 		return nil, fmt.Errorf("%w: received null data", transfer.ErrMissingData)
 	}
@@ -117,6 +121,8 @@ func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ transfer.Args) (in
 		return nil, err
 	}
 	if _, err := io.Copy(f, r); err != nil {
+		tracerx.Printf("Error copying data to temp file: %v", err)
+		f.Close() // nolint: errcheck
 		return nil, err
 	}
 	return &UploadState{
@@ -136,11 +142,14 @@ func (l *LocalBackend) Verify(oid string, args transfer.Args) (transfer.Status, 
 		return nil, fmt.Errorf("missing size argument")
 	}
 	stat, err := os.Stat(oidExpectedPath(l.lfsPath, oid))
+	if errors.Is(err, fs.ErrNotExist) {
+		return transfer.NewStatus(transfer.StatusNotFound, "not found"), nil
+	}
 	if err != nil {
 		return nil, err
 	}
 	if stat.Size() != int64(expectedSize) {
-		return transfer.NewFailureStatus(transfer.StatusConflict, "size mismatch"), nil
+		return transfer.NewStatus(transfer.StatusConflict, "size mismatch"), nil
 	}
 	return transfer.SuccessStatus(), nil
 }
@@ -176,8 +185,10 @@ func (l *localLockBackend) Create(path, _ string) (transfer.Lock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating local lock file: %w", err)
 	}
-	defer f.Remove() // nolint: errcheck
-	defer f.Close()  // nolint: errcheck
+	defer func() {
+		f.Close()  // nolint: errcheck
+		f.Remove() // nolint: errcheck
+	}()
 	if _, err := f.Write(b.Bytes()); err != nil {
 		return nil, err
 	}

@@ -244,15 +244,17 @@ func (p *Processor) Lock() (Status, error) {
 		lock, err := lockBackend.Create(path, refname)
 		if errors.Is(err, ErrConflict) {
 			p.logger.Log("lock conflict")
-			lock, err = lockBackend.FromPath(path)
-			if err != nil {
-				p.logger.Log("lock conflict, but no lock found")
-				if retried {
-					p.logger.Log("lock conflict, but no lock found, and retried")
-					return nil, err
+			if lock == nil {
+				lock, err = lockBackend.FromPath(path)
+				if err != nil {
+					p.logger.Log("lock conflict, but no lock found")
+					if retried {
+						p.logger.Log("lock conflict, but no lock found, and retried")
+						return nil, err
+					}
+					retried = true
+					continue
 				}
-				retried = true
-				continue
 			}
 			return NewFailureStatusWithArgs(StatusConflict, "conflict", lock.AsArguments()...), nil
 		}

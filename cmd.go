@@ -24,7 +24,8 @@ func ensureDirs(path string) error {
 	return nil
 }
 
-func run(r io.Reader, w io.Writer, args ...string) error {
+// Run runs the git-lfs-transfer command against the given I/O and arguments.
+func Run(r io.Reader, w io.Writer, args ...string) error {
 	if len(args) != 2 {
 		return fmt.Errorf("expected 2 arguments, got %d", len(args))
 	}
@@ -90,7 +91,7 @@ func Command(stdin io.Reader, stdout io.Writer, stderr io.Writer, args ...string
 	logger.Log("git-lfs-transfer", "version", "v1")
 	defer logger.Log("git-lfs-transfer completed")
 	go func() {
-		errc <- run(stdin, stdout, args...)
+		errc <- Run(stdin, stdout, args...)
 	}()
 
 	select {

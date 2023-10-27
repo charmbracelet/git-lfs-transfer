@@ -1,4 +1,4 @@
-package main
+package main_test
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	lfstransfer "github.com/charmbracelet/git-lfs-transfer"
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
 )
@@ -87,7 +88,7 @@ func TestFailedVerify(t *testing.T) {
 
 	var out bytes.Buffer
 	in := strings.NewReader(msg)
-	if err := run(in, &out, path, "upload"); err != nil {
+	if err := lfstransfer.Run(in, &out, path, "upload"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -132,7 +133,7 @@ func TestMissingObject(t *testing.T) {
 
 	var out bytes.Buffer
 	in := strings.NewReader(msg)
-	if err := run(in, &out, path, "upload"); err != nil {
+	if err := lfstransfer.Run(in, &out, path, "upload"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -180,7 +181,7 @@ func TestSimpleUpload(t *testing.T) {
 
 	var out bytes.Buffer
 	in := strings.NewReader(msg)
-	if err := run(in, &out, path, "upload"); err != nil {
+	if err := lfstransfer.Run(in, &out, path, "upload"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -214,7 +215,7 @@ func TestInvalidHashAlgo(t *testing.T) {
 
 	var out bytes.Buffer
 	in := strings.NewReader(msg)
-	if err := run(in, &out, path, "upload"); err != nil {
+	if err := lfstransfer.Run(in, &out, path, "upload"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -255,7 +256,7 @@ func TestSimpleDownload(t *testing.T) {
 
 	var out bytes.Buffer
 	in := strings.NewReader(msg)
-	if err := run(in, &out, path, "upload"); err != nil {
+	if err := lfstransfer.Run(in, &out, path, "upload"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -290,7 +291,7 @@ func TestSimpleDownload(t *testing.T) {
 
 	out.Reset()
 	in = strings.NewReader(msg)
-	if err := run(in, &out, path, "download"); err != nil {
+	if err := lfstransfer.Run(in, &out, path, "download"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -349,7 +350,7 @@ func TestInvalidUpload(t *testing.T) {
 
 	var out bytes.Buffer
 	in := strings.NewReader(msg)
-	if err := run(in, &out, path, "upload"); err != nil {
+	if err := lfstransfer.Run(in, &out, path, "upload"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -423,7 +424,7 @@ func TestSimpleLocking(t *testing.T) {
 
 	var out bytes.Buffer
 	in := strings.NewReader(msg)
-	if err := run(in, &out, path, "upload"); err != nil {
+	if err := lfstransfer.Run(in, &out, path, "upload"); err != nil {
 		t.Fatal(err)
 	}
 

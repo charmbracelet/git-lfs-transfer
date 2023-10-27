@@ -30,70 +30,75 @@ const (
 // PktLine is a Git packet line handler.
 type Pktline struct {
 	*pktline.Pktline
-	r io.Reader
-	w io.Writer
+	r      io.Reader
+	w      io.Writer
+	logger Logger
 }
 
 // NewPktline creates a new Git packet line handler.
-func NewPktline(r io.Reader, w io.Writer) *Pktline {
+func NewPktline(r io.Reader, w io.Writer, logger Logger) *Pktline {
+	if logger == nil {
+		logger = new(noopLogger)
+	}
 	return &Pktline{
 		Pktline: pktline.NewPktline(r, w),
 		r:       r,
 		w:       w,
+		logger:  logger,
 	}
 }
 
 // SendError sends an error msg.
 func (p *Pktline) SendError(status uint32, message string) error {
-	Logf("sending error: %d %s", status, message)
+	p.logger.Log("sending error status", "code", status, "msg", message)
 	if err := p.WritePacketText(fmt.Sprintf("status %03d", status)); err != nil {
-		Logf("error writing status: %s", err)
+		p.logger.Log("failed to write packet", "err", err)
 	}
 	if err := p.WriteDelim(); err != nil {
-		Logf("error writing delim: %s", err)
+		p.logger.Log("failed to write delimiter", "err", err)
 	}
 	if err := p.WritePacketText(message); err != nil {
-		Logf("error writing message: %s", err)
+		p.logger.Log("failed to write message", "err", err)
 	}
 	return p.WriteFlush()
 }
 
 // SendStatus sends a status message.
 func (p *Pktline) SendStatus(status Status) error {
-	Logf("sending status: %s", status)
+	p.logger.Log("sending status", "code", status)
 	if err := p.WritePacketText(fmt.Sprintf("status %03d", status.Code())); err != nil {
-		Logf("error writing status: %s", err)
+		p.logger.Log("failed to write status", "err", err)
 	}
 	if args := status.Args(); len(args) > 0 {
 		for _, arg := range args {
 			if err := p.WritePacketText(arg); err != nil {
-				Logf("error writing arg: %s", err)
+				p.logger.Log("failed to write argument", "arg", arg, "err", err)
 			}
 		}
 	}
 	if msgs := status.Messages(); len(msgs) > 0 {
 		if err := p.WriteDelim(); err != nil {
-			Logf("error writing delim: %s", err)
+			p.logger.Log("failed to write delimiter", "err", err)
 		}
 		for _, msg := range msgs {
 			if err := p.WritePacketText(msg); err != nil {
-				Logf("error writing msg: %s", err)
+				p.logger.Log("failed to write message", "err", err)
 			}
 		}
 	} else if r := status.Reader(); r != nil {
-		Logf("sending reader")
+		p.logger.Log("sending reader")
 		// Close reader if it implements io.Closer.
 		if c, ok := r.(io.Closer); ok {
 			defer c.Close() // nolint: errcheck
 		}
 		if err := p.WriteDelim(); err != nil {
-			Logf("error writing delim: %v", err)
+			p.logger.Log("failed to write delimiter", "err", err)
 		}
 		w := p.Writer()
 		if _, err := io.Copy(w, r); err != nil {
-			Logf("error copying reader: %v", err)
+			p.logger.Log("failed to copy reader", "err", err)
 		}
-		defer Logf("done copying")
+		defer p.logger.Log("done copying")
 		return w.Flush()
 	}
 	return p.WriteFlush()

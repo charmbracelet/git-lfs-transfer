@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"fmt"
@@ -31,7 +31,7 @@ func ensureDirs(path string) error {
 	return nil
 }
 
-func run(r io.Reader, w io.Writer, args []string) error {
+func run(r io.Reader, w io.Writer, args ...string) error {
 	if len(args) != 2 {
 		return fmt.Errorf("expected 2 arguments, got %d", len(args))
 	}
@@ -50,20 +50,20 @@ func run(r io.Reader, w io.Writer, args []string) error {
 		return err
 	}
 	umask := setPermissions(gitdir)
-	handler := transfer.NewPktline(r, w)
+	handler := transfer.NewPktline(r, w, logger)
 	for _, cap := range capabilities {
 		if err := handler.WritePacketText(cap); err != nil {
-			transfer.Logf("error sending capability: %s: %v", cap, err)
+			logger.Log("error sending capability", "cap", cap, "err", err)
 		}
 	}
 	if err := handler.WriteFlush(); err != nil {
-		transfer.Logf("error flushing capabilities: %v", err)
+		logger.Log("error flushing capabilities", "err", err)
 	}
 	now := time.Now()
-	transfer.Logf("umask %o", umask)
+	logger.Log("umask", "umask", umask)
 	backend := local.New(lfsPath, umask, &now)
-	p := transfer.NewProcessor(handler, backend)
-	defer transfer.Log("done processing commands")
+	p := transfer.NewProcessor(handler, backend, logger)
+	defer logger.Log("done processing commands")
 	switch op {
 	case "upload":
 		return p.ProcessCommands(transfer.UploadOperation)
@@ -94,17 +94,17 @@ func Command(stdin io.Reader, stdout io.Writer, stderr io.Writer, args ...string
 	errc := make(chan error, 1)
 
 	setup(done)
-	transfer.Logf("git-lfs-transfer %s", "v1")
-	defer transfer.Log("git-lfs-transfer completed")
+	logger.Log("git-lfs-transfer", "version", "v1")
+	defer logger.Log("git-lfs-transfer completed")
 	go func() {
-		errc <- run(stdin, stdout, args)
+		errc <- run(stdin, stdout, args...)
 	}()
 
 	select {
 	case s := <-done:
-		transfer.Logf("signal %q received", s)
+		logger.Log("signal received", "signal", s)
 	case err := <-errc:
-		transfer.Log("done running")
+		logger.Log("done running")
 		fmt.Fprintln(stderr, Usage())
 		fmt.Fprintln(stderr, err)
 		if err != nil {

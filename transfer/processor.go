@@ -35,20 +35,12 @@ func (p *Processor) Version() (Status, error) {
 }
 
 // Error returns a transfer protocol error.
-func (p *Processor) Error(code uint32, message string) (Status, error) {
-	return NewFailureStatus(code, message), nil
+func (p *Processor) Error(code uint32, message string, args ...string) (Status, error) {
+	return NewFailureStatusWithArgs(code, message, args...), nil
 }
 
 // ReadBatch reads a batch request.
-func (p *Processor) ReadBatch(op string) ([]BatchItem, error) {
-	ar, err := p.handler.ReadPacketListToDelim()
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
-	}
-	args, err := ParseArgs(ar)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
-	}
+func (p *Processor) ReadBatch(op string, args Args) ([]BatchItem, error) {
 	data, err := p.handler.ReadPacketListToFlush()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
@@ -61,22 +53,32 @@ func (p *Processor) ReadBatch(op string) ([]BatchItem, error) {
 	}
 	Logf("data: %d %v", len(data), data)
 	Logf("batch: %s args: %d %v data: %d %v", op, len(args), args, len(data), data)
-	items := make([]Pointer, 0)
+	items := make([]BatchItem, 0)
 	for _, line := range data {
 		if line == "" {
 			return nil, ErrInvalidPacket
 		}
-		parts := strings.SplitN(line, " ", 2)
-		if len(parts) != 2 || parts[1] == "" {
+		parts := strings.Split(line, " ")
+		if len(parts) < 2 || parts[1] == "" {
 			return nil, ErrParseError
 		}
 		size, err := strconv.ParseInt(parts[1], 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid integer, got: %q", ErrParseError, parts[1])
 		}
-		item := Pointer{
-			parts[0],
-			size,
+		var oidArgs Args
+		if len(parts) > 2 {
+			oidArgs, err = ParseArgs(parts[2:])
+			if err != nil {
+				return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+			}
+		}
+		item := BatchItem{
+			Pointer: Pointer{
+				Oid:  parts[0],
+				Size: size,
+			},
+			Args: oidArgs,
 		}
 		items = append(items, item)
 	}
@@ -91,9 +93,17 @@ func (p *Processor) ReadBatch(op string) ([]BatchItem, error) {
 
 // BatchData writes batch data to the transfer protocol.
 func (p *Processor) BatchData(op string, presentAction string, missingAction string) (Status, error) {
-	batch, err := p.ReadBatch(op)
+	ar, err := p.handler.ReadPacketListToDelim()
 	if err != nil {
-		return p.Error(StatusBadRequest, err.Error())
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	args, err := ParseArgs(ar)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	batch, err := p.ReadBatch(op, args)
+	if err != nil {
+		return p.Error(StatusBadRequest, err.Error(), ArgsToList(args)...)
 	}
 	oids := make([]string, 0)
 	for _, item := range batch {
@@ -101,7 +111,11 @@ func (p *Processor) BatchData(op string, presentAction string, missingAction str
 		if item.Present {
 			action = presentAction
 		}
-		oids = append(oids, fmt.Sprintf("%s %d %s", item.Oid, item.Size, action))
+		line := fmt.Sprintf("%s %s", item.Pointer, action)
+		if len(item.Args) > 0 {
+			line = fmt.Sprintf("%s %s", line, item.Args)
+		}
+		oids = append(oids, line)
 	}
 	return NewSuccessStatus(oids), nil
 }
@@ -117,7 +131,7 @@ func (p *Processor) DownloadBatch() (Status, error) {
 }
 
 // SizeFromArgs returns the size from the given args.
-func (Processor) SizeFromArgs(args map[string]string) (int64, error) {
+func SizeFromArgs(args Args) (int64, error) {
 	size, ok := args[SizeKey]
 	if !ok {
 		return 0, fmt.Errorf("missing required size header")
@@ -139,7 +153,7 @@ func (p *Processor) PutObject(oid string) (Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
-	expectedSize, err := p.SizeFromArgs(args)
+	expectedSize, err := SizeFromArgs(args)
 	if err != nil {
 		return nil, err
 	}

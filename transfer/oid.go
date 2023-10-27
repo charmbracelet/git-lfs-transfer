@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"fmt"
 	"path"
 	"regexp"
 )
@@ -9,6 +10,11 @@ import (
 type Pointer struct {
 	Oid  string `json:"oid"`
 	Size int64  `json:"size"`
+}
+
+// String returns the string representation of the pointer.
+func (p Pointer) String() string {
+	return fmt.Sprintf("%s %d", p.Oid, p.Size)
 }
 
 var oidPattern = regexp.MustCompile(`^[a-f\d]{64}$`)

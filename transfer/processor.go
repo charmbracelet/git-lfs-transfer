@@ -167,6 +167,7 @@ func (p *Processor) PutObject(oid string) (Status, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer state.Close()
 	actualSize := rdr.Size()
 	if actualSize != expectedSize {
 		err := fmt.Errorf("invalid size, expected %d, got %d", expectedSize, actualSize)

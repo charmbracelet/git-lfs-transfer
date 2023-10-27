@@ -15,8 +15,8 @@ const (
 // Backend is a Git LFS backend.
 type Backend interface {
 	Batch(op string, pointers []BatchItem, args Args) ([]BatchItem, error)
-	StartUpload(oid string, r io.Reader, args Args) (interface{}, error)
-	FinishUpload(state interface{}, args Args) error
+	StartUpload(oid string, r io.Reader, args Args) (io.Closer, error)
+	FinishUpload(state io.Closer, args Args) error
 	Verify(oid string, args Args) (Status, error)
 	Download(oid string, args Args) (fs.File, error)
 	LockBackend(args Args) LockBackend

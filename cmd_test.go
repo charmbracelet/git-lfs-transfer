@@ -38,12 +38,12 @@ func replaceUserId(s string) string {
 	case "windows":
 		username = "unknown"
 	}
-	s = strings.ReplaceAll(s, "0018ownername=test user", fmt.Sprintf("%04xownername=%s",
+	s = strings.ReplaceAll(s, "0018ownername=test user\n", fmt.Sprintf("%04xownername=%s\n",
 		4+len("ownername=")+len(username+"\n"),
 		username))
 
-	s = strings.ReplaceAll(s, "0059ownername d76670443f4d5ecdeea34c12793917498e18e858c6f74cd38c4b794273bb5e28 test user",
-		fmt.Sprintf("%04xownername d76670443f4d5ecdeea34c12793917498e18e858c6f74cd38c4b794273bb5e28 %s",
+	s = strings.ReplaceAll(s, "0059ownername d76670443f4d5ecdeea34c12793917498e18e858c6f74cd38c4b794273bb5e28 test user\n",
+		fmt.Sprintf("%04xownername d76670443f4d5ecdeea34c12793917498e18e858c6f74cd38c4b794273bb5e28 %s\n",
 			4+len("ownername d76670443f4d5ecdeea34c12793917498e18e858c6f74cd38c4b794273bb5e28 ")+len(username+"\n"),
 			username))
 

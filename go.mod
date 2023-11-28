@@ -8,7 +8,7 @@ require (
 	github.com/go-git/go-git/v5 v5.10.0
 	github.com/rubyist/tracerx v0.0.0-20170927163412-787959303086
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/sys v0.14.0
+	golang.org/x/sys v0.15.0
 )
 
 require (

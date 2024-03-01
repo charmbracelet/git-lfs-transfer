@@ -7,7 +7,7 @@ require (
 	github.com/git-lfs/pktline v0.0.0-20230103162542-ca444d533ef1
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/rubyist/tracerx v0.0.0-20170927163412-787959303086
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	golang.org/x/sys v0.17.0
 )
 

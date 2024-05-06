@@ -29,9 +29,9 @@ func oidExpectedPath(root, oid string) string {
 
 // LocalBackend is a local Git LFS backend.
 type LocalBackend struct { // nolint: revive
+	timestamp *time.Time
 	lfsPath   string
 	umask     fs.FileMode
-	timestamp *time.Time
 }
 
 // New creates a new local backend. lfsPath should be a `.git/lfs` directory.
@@ -96,10 +96,11 @@ func (l *LocalBackend) LockBackend(_ transfer.Args) transfer.LockBackend {
 
 // UploadState is a state for an upload.
 type UploadState struct {
-	Oid      string
 	TempFile *os.File
+	Oid      string
 }
 
+// Close implements io.Closer.
 func (u *UploadState) Close() error {
 	return u.TempFile.Close()
 }

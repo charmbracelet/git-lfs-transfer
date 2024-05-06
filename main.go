@@ -35,7 +35,7 @@ func main() {
 		os.Exit(1)
 	}
 	if err := Command(os.Stdin, os.Stdout, os.Stderr, args[1:]...); err != nil {
-		fmt.Fprintf(os.Stderr, Usage())
+		fmt.Fprint(os.Stderr, Usage())
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, err)
 		switch {

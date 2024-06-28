@@ -10,12 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/git-lfs-transfer/transfer"
-	"github.com/rubyist/tracerx"
 )
 
 var _ transfer.Backend = &LocalBackend{}
@@ -59,33 +57,16 @@ func (l *LocalBackend) Batch(_ string, pointers []transfer.BatchItem, _ transfer
 
 // Download implements main.Backend. The returned reader must be closed by the
 // caller.
-func (l *LocalBackend) Download(oid string, _ transfer.Args) (fs.File, error) {
+func (l *LocalBackend) Download(oid string, _ transfer.Args) (io.ReadCloser, int64, error) {
 	f, err := os.Open(oidExpectedPath(l.lfsPath, oid))
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return f, nil
-}
-
-// FinishUpload implements main.Backend.
-func (l *LocalBackend) FinishUpload(state io.Closer, _ transfer.Args) error {
-	switch state := state.(type) {
-	case *UploadState:
-		destPath := oidExpectedPath(l.lfsPath, state.Oid)
-		parent := filepath.Dir(destPath)
-		if err := os.MkdirAll(parent, 0777); err != nil {
-			return err
-		}
-		if err := os.Link(state.TempFile.Name(), destPath); err != nil {
-			return err
-		}
-		if _, err := l.FixPermissions(destPath); err != nil {
-			return err
-		}
-		return nil
-	default:
-		return fmt.Errorf("invalid state type: %T", state)
+	info, err := f.Stat()
+	if err != nil {
+		return nil, 0, err
 	}
+	return f, info.Size(), nil
 }
 
 // LockBackend implements main.Backend.
@@ -94,52 +75,47 @@ func (l *LocalBackend) LockBackend(_ transfer.Args) transfer.LockBackend {
 	return NewLockBackend(l, path)
 }
 
-// UploadState is a state for an upload.
-type UploadState struct {
-	TempFile *os.File
-	Oid      string
-}
-
-// Close implements io.Closer.
-func (u *UploadState) Close() error {
-	return u.TempFile.Close()
-}
-
-// StartUpload implements main.Backend. The returned temp file should be closed.
-func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ transfer.Args) (io.Closer, error) {
+// Upload implements main.Backend.
+func (l *LocalBackend) Upload(oid string, size int64, r io.Reader, _ transfer.Args) error {
 	if r == nil {
-		return nil, fmt.Errorf("%w: received null data", transfer.ErrMissingData)
+		return fmt.Errorf("%w: received null data", transfer.ErrMissingData)
 	}
 	tempDir := filepath.Join(l.lfsPath, "incomplete")
 	randBytes := make([]byte, 12)
 	if _, err := rand.Read(randBytes); err != nil {
-		return nil, err
+		return err
 	}
 	tempName := fmt.Sprintf("%s%x", oid, randBytes)
 	tempFile := filepath.Join(tempDir, tempName)
 	f, err := os.Create(tempFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer func() {
+		f.Close()
+		os.Remove(tempFile)
+	}()
 	if _, err := io.Copy(f, r); err != nil {
-		tracerx.Printf("Error copying data to temp file: %v", err)
-		f.Close() // nolint: errcheck
-		return nil, err
+		return err
 	}
-	return &UploadState{
-		Oid:      oid,
-		TempFile: f,
-	}, nil
+	f.Close() // double-close is fine
+	destPath := oidExpectedPath(l.lfsPath, oid)
+	parent := filepath.Dir(destPath)
+	if err := os.MkdirAll(parent, 0777); err != nil {
+		return err
+	}
+	if err := os.Link(tempFile, destPath); err != nil {
+		return err
+	}
+	if _, err := l.FixPermissions(destPath); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Verify implements main.Backend.
-func (l *LocalBackend) Verify(oid string, args transfer.Args) (transfer.Status, error) {
-	var expectedSize int
-	size, ok := args[transfer.SizeKey]
-	if ok {
-		expectedSize, _ = strconv.Atoi(size)
-	}
-	if expectedSize == 0 {
+func (l *LocalBackend) Verify(oid string, size int64, args transfer.Args) (transfer.Status, error) {
+	if size == 0 {
 		return nil, fmt.Errorf("missing size argument")
 	}
 	stat, err := os.Stat(oidExpectedPath(l.lfsPath, oid))
@@ -149,7 +125,7 @@ func (l *LocalBackend) Verify(oid string, args transfer.Args) (transfer.Status, 
 	if err != nil {
 		return nil, err
 	}
-	if stat.Size() != int64(expectedSize) {
+	if stat.Size() != size {
 		return transfer.NewStatus(transfer.StatusConflict, "size mismatch"), nil
 	}
 	return transfer.SuccessStatus(), nil

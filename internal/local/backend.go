@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/git-lfs-transfer/transfer"
-	"github.com/rubyist/tracerx"
 )
 
 var _ transfer.Backend = &LocalBackend{}
@@ -76,63 +75,42 @@ func (l *LocalBackend) LockBackend(_ transfer.Args) transfer.LockBackend {
 	return NewLockBackend(l, path)
 }
 
-// UploadState is a state for an upload.
-type UploadState struct {
-	TempFile *os.File
-	Oid      string
-}
-
-// Close implements io.Closer.
-func (u *UploadState) Close() error {
-	return u.TempFile.Close()
-}
-
-// StartUpload implements main.Backend. The returned temp file should be closed.
-func (l *LocalBackend) StartUpload(oid string, size int64, r io.Reader, _ transfer.Args) (io.Closer, error) {
+// Upload implements main.Backend.
+func (l *LocalBackend) Upload(oid string, size int64, r io.Reader, _ transfer.Args) error {
 	if r == nil {
-		return nil, fmt.Errorf("%w: received null data", transfer.ErrMissingData)
+		return fmt.Errorf("%w: received null data", transfer.ErrMissingData)
 	}
 	tempDir := filepath.Join(l.lfsPath, "incomplete")
 	randBytes := make([]byte, 12)
 	if _, err := rand.Read(randBytes); err != nil {
-		return nil, err
+		return err
 	}
 	tempName := fmt.Sprintf("%s%x", oid, randBytes)
 	tempFile := filepath.Join(tempDir, tempName)
 	f, err := os.Create(tempFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer func() {
+		f.Close()
+		os.Remove(tempFile)
+	}()
 	if _, err := io.Copy(f, r); err != nil {
-		tracerx.Printf("Error copying data to temp file: %v", err)
-		f.Close() // nolint: errcheck
-		return nil, err
+		return err
 	}
-	return &UploadState{
-		Oid:      oid,
-		TempFile: f,
-	}, nil
-}
-
-// FinishUpload implements main.Backend.
-func (l *LocalBackend) FinishUpload(state io.Closer, _ transfer.Args) error {
-	switch state := state.(type) {
-	case *UploadState:
-		destPath := oidExpectedPath(l.lfsPath, state.Oid)
-		parent := filepath.Dir(destPath)
-		if err := os.MkdirAll(parent, 0777); err != nil {
-			return err
-		}
-		if err := os.Link(state.TempFile.Name(), destPath); err != nil {
-			return err
-		}
-		if _, err := l.FixPermissions(destPath); err != nil {
-			return err
-		}
-		return nil
-	default:
-		return fmt.Errorf("invalid state type: %T", state)
+	f.Close() // double-close is fine
+	destPath := oidExpectedPath(l.lfsPath, oid)
+	parent := filepath.Dir(destPath)
+	if err := os.MkdirAll(parent, 0777); err != nil {
+		return err
 	}
+	if err := os.Link(tempFile, destPath); err != nil {
+		return err
+	}
+	if _, err := l.FixPermissions(destPath); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Verify implements main.Backend.

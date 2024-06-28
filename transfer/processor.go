@@ -163,7 +163,7 @@ func (p *Processor) PutObject(oid string) (Status, error) {
 	}
 	r := p.handler.Reader()
 	rdr := NewHashingReader(r, sha256.New())
-	state, err := p.backend.StartUpload(oid, rdr, args)
+	state, err := p.backend.StartUpload(oid, expectedSize, rdr, args)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,11 @@ func (p *Processor) VerifyObject(oid string) (Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
-	return p.backend.Verify(oid, args)
+	size, err := SizeFromArgs(args)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
+	}
+	return p.backend.Verify(oid, size, args)
 }
 
 // GetObject writes an object ID to the transfer protocol.
@@ -210,18 +214,14 @@ func (p *Processor) GetObject(oid string) (Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParseError, err)
 	}
-	r, err := p.backend.Download(oid, args)
+	r, size, err := p.backend.Download(oid, args)
 	if errors.Is(err, fs.ErrNotExist) {
 		return NewStatus(StatusNotFound, fmt.Sprintf("object %s not found", oid)), nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	info, err := r.Stat()
-	if err != nil {
-		return nil, err
-	}
-	return NewSuccessStatusWithReader(r, fmt.Sprintf("size=%d", info.Size())), nil
+	return NewSuccessStatusWithReader(r, fmt.Sprintf("size=%d", size)), nil
 }
 
 // Lock writes a lock to the transfer protocol.

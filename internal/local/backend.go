@@ -70,27 +70,6 @@ func (l *LocalBackend) Download(oid string, _ transfer.Args) (io.ReadCloser, int
 	return f, info.Size(), nil
 }
 
-// FinishUpload implements main.Backend.
-func (l *LocalBackend) FinishUpload(state io.Closer, _ transfer.Args) error {
-	switch state := state.(type) {
-	case *UploadState:
-		destPath := oidExpectedPath(l.lfsPath, state.Oid)
-		parent := filepath.Dir(destPath)
-		if err := os.MkdirAll(parent, 0777); err != nil {
-			return err
-		}
-		if err := os.Link(state.TempFile.Name(), destPath); err != nil {
-			return err
-		}
-		if _, err := l.FixPermissions(destPath); err != nil {
-			return err
-		}
-		return nil
-	default:
-		return fmt.Errorf("invalid state type: %T", state)
-	}
-}
-
 // LockBackend implements main.Backend.
 func (l *LocalBackend) LockBackend(_ transfer.Args) transfer.LockBackend {
 	path := filepath.Join(l.lfsPath, "locks")
@@ -133,6 +112,27 @@ func (l *LocalBackend) StartUpload(oid string, size int64, r io.Reader, _ transf
 		Oid:      oid,
 		TempFile: f,
 	}, nil
+}
+
+// FinishUpload implements main.Backend.
+func (l *LocalBackend) FinishUpload(state io.Closer, _ transfer.Args) error {
+	switch state := state.(type) {
+	case *UploadState:
+		destPath := oidExpectedPath(l.lfsPath, state.Oid)
+		parent := filepath.Dir(destPath)
+		if err := os.MkdirAll(parent, 0777); err != nil {
+			return err
+		}
+		if err := os.Link(state.TempFile.Name(), destPath); err != nil {
+			return err
+		}
+		if _, err := l.FixPermissions(destPath); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return fmt.Errorf("invalid state type: %T", state)
+	}
 }
 
 // Verify implements main.Backend.

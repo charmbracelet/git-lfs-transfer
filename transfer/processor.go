@@ -162,26 +162,9 @@ func (p *Processor) PutObject(oid string) (Status, error) {
 		return nil, err
 	}
 	r := p.handler.Reader()
-	rdr := NewHashingReader(r, sha256.New())
-	state, err := p.backend.StartUpload(oid, expectedSize, rdr, args)
+	rdr := NewVerifyingReader(r, sha256.New(), oid, expectedSize)
+	err = p.backend.Upload(oid, expectedSize, rdr, args)
 	if err != nil {
-		return nil, err
-	}
-	defer state.Close() // nolint: errcheck
-	actualSize := rdr.Size()
-	if actualSize != expectedSize {
-		err := fmt.Errorf("invalid size, expected %d, got %d", expectedSize, actualSize)
-		if actualSize > expectedSize {
-			err = fmt.Errorf("%w: %s", ErrExtraData, err)
-		} else {
-			err = fmt.Errorf("%w: %s", ErrMissingData, err)
-		}
-		return nil, err
-	}
-	if actualOid := rdr.Oid(); actualOid != oid {
-		return nil, fmt.Errorf("%w: %s", ErrCorruptData, fmt.Sprintf("invalid object ID, expected %s, got %s", oid, actualOid))
-	}
-	if err := p.backend.FinishUpload(state, args); err != nil {
 		return nil, err
 	}
 	return SuccessStatus(), nil

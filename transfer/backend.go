@@ -2,7 +2,6 @@ package transfer
 
 import (
 	"io"
-	"io/fs"
 )
 
 const (
@@ -18,7 +17,7 @@ type Backend interface {
 	StartUpload(oid string, size int64, r io.Reader, args Args) (io.Closer, error)
 	FinishUpload(state io.Closer, args Args) error
 	Verify(oid string, size int64, args Args) (Status, error)
-	Download(oid string, args Args) (fs.File, int64, error)
+	Download(oid string, args Args) (io.ReadCloser, int64, error)
 	LockBackend(args Args) LockBackend
 }
 

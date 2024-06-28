@@ -58,7 +58,7 @@ func (l *LocalBackend) Batch(_ string, pointers []transfer.BatchItem, _ transfer
 
 // Download implements main.Backend. The returned reader must be closed by the
 // caller.
-func (l *LocalBackend) Download(oid string, _ transfer.Args) (fs.File, int64, error) {
+func (l *LocalBackend) Download(oid string, _ transfer.Args) (io.ReadCloser, int64, error) {
 	f, err := os.Open(oidExpectedPath(l.lfsPath, oid))
 	if err != nil {
 		return nil, 0, err

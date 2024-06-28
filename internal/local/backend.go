@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -59,12 +58,16 @@ func (l *LocalBackend) Batch(_ string, pointers []transfer.BatchItem, _ transfer
 
 // Download implements main.Backend. The returned reader must be closed by the
 // caller.
-func (l *LocalBackend) Download(oid string, _ transfer.Args) (fs.File, error) {
+func (l *LocalBackend) Download(oid string, _ transfer.Args) (fs.File, int64, error) {
 	f, err := os.Open(oidExpectedPath(l.lfsPath, oid))
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return f, nil
+	info, err := f.Stat()
+	if err != nil {
+		return nil, 0, err
+	}
+	return f, info.Size(), nil
 }
 
 // FinishUpload implements main.Backend.
@@ -106,7 +109,7 @@ func (u *UploadState) Close() error {
 }
 
 // StartUpload implements main.Backend. The returned temp file should be closed.
-func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ transfer.Args) (io.Closer, error) {
+func (l *LocalBackend) StartUpload(oid string, size int64, r io.Reader, _ transfer.Args) (io.Closer, error) {
 	if r == nil {
 		return nil, fmt.Errorf("%w: received null data", transfer.ErrMissingData)
 	}
@@ -133,13 +136,8 @@ func (l *LocalBackend) StartUpload(oid string, r io.Reader, _ transfer.Args) (io
 }
 
 // Verify implements main.Backend.
-func (l *LocalBackend) Verify(oid string, args transfer.Args) (transfer.Status, error) {
-	var expectedSize int
-	size, ok := args[transfer.SizeKey]
-	if ok {
-		expectedSize, _ = strconv.Atoi(size)
-	}
-	if expectedSize == 0 {
+func (l *LocalBackend) Verify(oid string, size int64, args transfer.Args) (transfer.Status, error) {
+	if size == 0 {
 		return nil, fmt.Errorf("missing size argument")
 	}
 	stat, err := os.Stat(oidExpectedPath(l.lfsPath, oid))
@@ -149,7 +147,7 @@ func (l *LocalBackend) Verify(oid string, args transfer.Args) (transfer.Status, 
 	if err != nil {
 		return nil, err
 	}
-	if stat.Size() != int64(expectedSize) {
+	if stat.Size() != size {
 		return transfer.NewStatus(transfer.StatusConflict, "size mismatch"), nil
 	}
 	return transfer.SuccessStatus(), nil

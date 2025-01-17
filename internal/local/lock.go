@@ -32,21 +32,17 @@ func NewLockFile(path string) (*LockFile, error) {
 		path: path,
 		temp: temp,
 	}
-	// If the lock file already exists, return an error.
-	if _, err := os.Stat(temp); err == nil {
-		f, err := os.Open(temp)
-		if err != nil {
-			return nil, transfer.ErrConflict
-		}
+
+	if f, err := os.OpenFile(temp, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666); err == nil {
 		lf.tempFile = f
-		return lf, transfer.ErrConflict
+		return lf, nil
+	} else if os.IsExist(err) {
+		if f, err = os.OpenFile(temp, os.O_RDONLY, 0666); err == nil {
+			lf.tempFile = f
+			return lf, transfer.ErrConflict
+		}
 	}
-	f, err := os.Create(temp)
-	if err != nil {
-		return nil, err
-	}
-	lf.tempFile = f
-	return lf, nil
+	return nil, transfer.ErrConflict
 }
 
 // Write writes the given data to the lock file.

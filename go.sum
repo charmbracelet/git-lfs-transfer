@@ -26,12 +26,12 @@ github.com/elazarl/goproxy v1.7.2 h1:Y2o6urb7Eule09PjlhQRGNsqRfPmYI3KKQLFpCAV3+o
 github.com/elazarl/goproxy v1.7.2/go.mod h1:82vkLNir0ALaW14Rc399OTTjyNREgmdL2cVoIbS6XaE=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=
-github.com/git-lfs/git-lfs/v3 v3.6.1 h1:0RA2HzkMVl69KE5zCGY1PxqkDSbd/f/O7Du6CNkTYtY=
-github.com/git-lfs/git-lfs/v3 v3.6.1/go.mod h1:1YO3nafGw2wKBR5LTZ7/LXJ7U7ELdvIGvcCBrLt6mfM=
+github.com/git-lfs/git-lfs/v3 v3.7.0 h1:1ok1tLci2otCsTruDjpKF3ER+NbCO2n+e4PKHq0CJNk=
+github.com/git-lfs/git-lfs/v3 v3.7.0/go.mod h1:KMl1legoclSotIdD1jbqoVo+C5KdE8sMkwiGGnRGsAc=
 github.com/git-lfs/gitobj/v2 v2.1.1 h1:tf/VU6zL1kxa3he+nf6FO/syX+LGkm6WGDsMpfuXV7Q=
 github.com/git-lfs/gitobj/v2 v2.1.1/go.mod h1:q6aqxl6Uu3gWsip5GEKpw+7459F97er8COmU45ncAxw=
-github.com/git-lfs/go-netrc v0.0.0-20210914205454-f0c862dd687a h1:6pskVZacdMUL93pCpMAYnMDLjH1yDFhssPYGe32sjdk=
-github.com/git-lfs/go-netrc v0.0.0-20210914205454-f0c862dd687a/go.mod h1:70O4NAtvWn1jW8V8V+OKrJJYcxDLTmIozfi2fmSz5SI=
+github.com/git-lfs/go-netrc v0.0.0-20250218165306-ba0029b43d11 h1:LotqdxyBRc7u2fxoBrzW6Mn3ZBvv7FlcBPlAa10DKAg=
+github.com/git-lfs/go-netrc v0.0.0-20250218165306-ba0029b43d11/go.mod h1:GTFwpcANSAXgAw+IaUFijK1DZFT0D1x0Wh9rG+Fa814=
 github.com/git-lfs/pktline v0.0.0-20230103162542-ca444d533ef1 h1:mtDjlmloH7ytdblogrMz1/8Hqua1y8B4ID+bh3rvod0=
 github.com/git-lfs/pktline v0.0.0-20230103162542-ca444d533ef1/go.mod h1:fenKRzpXDjNpsIBhuhUzvjCKlDjKam0boRAenTE0Q6A=
 github.com/git-lfs/wildmatch/v2 v2.0.1 h1:Ds+aobrV5bK0wStILUOn9irllPyf9qrFETbKzwzoER8=

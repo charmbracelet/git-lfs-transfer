@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.24.1
 
 require (
-	github.com/git-lfs/git-lfs/v3 v3.6.1
+	github.com/git-lfs/git-lfs/v3 v3.7.0
 	github.com/git-lfs/pktline v0.0.0-20230103162542-ca444d533ef1
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/rubyist/tracerx v0.0.0-20170927163412-787959303086

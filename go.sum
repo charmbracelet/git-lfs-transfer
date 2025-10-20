@@ -26,8 +26,8 @@ github.com/elazarl/goproxy v1.7.2 h1:Y2o6urb7Eule09PjlhQRGNsqRfPmYI3KKQLFpCAV3+o
 github.com/elazarl/goproxy v1.7.2/go.mod h1:82vkLNir0ALaW14Rc399OTTjyNREgmdL2cVoIbS6XaE=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=
-github.com/git-lfs/git-lfs/v3 v3.7.0 h1:1ok1tLci2otCsTruDjpKF3ER+NbCO2n+e4PKHq0CJNk=
-github.com/git-lfs/git-lfs/v3 v3.7.0/go.mod h1:KMl1legoclSotIdD1jbqoVo+C5KdE8sMkwiGGnRGsAc=
+github.com/git-lfs/git-lfs/v3 v3.7.1 h1:7GoH/otMZgdh15w1PkKkFYe+zUZ54qSqrmQkcvsfGOc=
+github.com/git-lfs/git-lfs/v3 v3.7.1/go.mod h1:KMl1legoclSotIdD1jbqoVo+C5KdE8sMkwiGGnRGsAc=
 github.com/git-lfs/gitobj/v2 v2.1.1 h1:tf/VU6zL1kxa3he+nf6FO/syX+LGkm6WGDsMpfuXV7Q=
 github.com/git-lfs/gitobj/v2 v2.1.1/go.mod h1:q6aqxl6Uu3gWsip5GEKpw+7459F97er8COmU45ncAxw=
 github.com/git-lfs/go-netrc v0.0.0-20250218165306-ba0029b43d11 h1:LotqdxyBRc7u2fxoBrzW6Mn3ZBvv7FlcBPlAa10DKAg=

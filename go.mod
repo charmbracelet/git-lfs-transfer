@@ -10,7 +10,7 @@ require (
 	github.com/go-git/go-git/v5 v5.16.3
 	github.com/rubyist/tracerx v0.0.0-20170927163412-787959303086
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sys v0.37.0
+	golang.org/x/sys v0.38.0
 )
 
 require (

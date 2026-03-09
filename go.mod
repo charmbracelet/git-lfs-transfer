@@ -1,8 +1,6 @@
 module github.com/charmbracelet/git-lfs-transfer
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.25.0
 
 require (
 	github.com/git-lfs/git-lfs/v3 v3.7.1
@@ -10,7 +8,7 @@ require (
 	github.com/go-git/go-git/v5 v5.17.0
 	github.com/rubyist/tracerx v0.0.0-20170927163412-787959303086
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sys v0.41.0
+	golang.org/x/sys v0.42.0
 )
 
 require (

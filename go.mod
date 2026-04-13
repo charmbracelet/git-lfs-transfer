@@ -5,10 +5,10 @@ go 1.25.0
 require (
 	github.com/git-lfs/git-lfs/v3 v3.7.1
 	github.com/git-lfs/pktline v0.0.0-20230103162542-ca444d533ef1
-	github.com/go-git/go-git/v5 v5.17.0
+	github.com/go-git/go-git/v5 v5.17.2
 	github.com/rubyist/tracerx v0.0.0-20170927163412-787959303086
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sys v0.42.0
+	golang.org/x/sys v0.43.0
 )
 
 require (
@@ -16,7 +16,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/avast/retry-go v3.0.0+incompatible // indirect
-	github.com/cloudflare/circl v1.6.1 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect

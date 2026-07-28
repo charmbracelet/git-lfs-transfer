@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -12,6 +13,18 @@ import (
 	"github.com/charmbracelet/git-lfs-transfer/transfer"
 	"github.com/rubyist/tracerx"
 )
+
+// isBareRepo checks if the given path is a bare git repository by
+// invoking git rev-parse --is-bare-repository. This is the reliable way
+// to detect bare repos regardless of their naming.
+func isBareRepo(path string) bool {
+	cmd := exec.Command("git", "rev-parse", "--is-bare-repository", "-C", path)
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(output)) == "true"
+}
 
 func ensureDirs(path string) error {
 	for _, dir := range []string{
@@ -35,10 +48,22 @@ func Run(r io.Reader, w io.Writer, args ...string) error {
 	if err != nil {
 		return err
 	}
-	gitdir := path
-	if !strings.HasSuffix(path, ".git") {
-		gitdir = filepath.Join(path, ".git")
+
+	// Determine the git directory based on whether this is a bare repo.
+	// A bare repo's git directory is the repo itself; a non-bare repo
+	// has its git dir at <path>/.git.
+	var gitdir string
+	if isBareRepo(path) {
+		gitdir = path
+	} else {
+		// Not a bare repo (or detection failed); fall back to heuristic.
+		if !strings.HasSuffix(path, ".git") {
+			gitdir = filepath.Join(path, ".git")
+		} else {
+			gitdir = path
+		}
 	}
+
 	lfsPath := filepath.Join(gitdir, "lfs")
 	if err := ensureDirs(lfsPath); err != nil {
 		return err
@@ -98,9 +123,9 @@ func Command(stdin io.Reader, stdout io.Writer, stderr io.Writer, args ...string
 	case s := <-done:
 		logger.Log("signal received", "signal", s)
 	case err := <-errc:
-		logger.Log("done running")
-		fmt.Fprintln(stderr, Usage())
-		fmt.Fprintln(stderr, err)
+		fmt.Fprint(stderr, Usage())
+		fmt.Fprint(stderr, "\n")
+		fmt.Fprint(stderr, err)
 		if err != nil {
 			return err
 		}

@@ -22,20 +22,27 @@ func setPermissions(path string) os.FileMode {
 	}
 	var val int
 	sr := config.Find("core.sharedrepository")
-	switch sr {
-	case "true", "group":
+	// Handle special case where "1" is used (like from git init --shared=1)
+	// This should be treated as "true"/group sharing, not octal 1.
+	if sr == "1" {
 		val = 0660
-	case "all", "world", "everybody":
-		val = 0664
-	case "false", "umask":
-	default:
-		v, _ := strconv.ParseUint(sr, 8, 32)
-		val = int(v)
+	} else {
+		switch sr {
+		case "true", "group":
+			val = 0660
+		case "all", "world", "everybody":
+			val = 0664
+		case "false", "umask":
+			fallthrough
+		default:
+			v, _ := strconv.ParseUint(sr, 8, 32)
+			val = int(v)
+		}
 	}
 	umask := unix.Umask(0)
 	unix.Umask(umask)
 	if val != 0 {
-		umask = 0777 &^ val
+		umask = 0777 &^ int(val)
 	}
 	return os.FileMode(umask)
 }
